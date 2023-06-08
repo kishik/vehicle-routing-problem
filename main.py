@@ -67,9 +67,11 @@ if uploaded_file is not None:
             (data_csv['department'] == 'Ступинская') & (data_csv['date_start'] >= pd.Timestamp(data_start)) & (
                     data_csv['date_end'] <= pd.Timestamp(data_finish)) & (
                     data_csv['brigada'] == 'Ступинская-Горголя-1')]
-        data_csv = filtered_data[["date_start", 'date_end', 'address']]
+        # data_csv = filtered_data[["date_start", 'date_end', 'address']]
+        data_csv = filtered_data
 
-        edited_df = st.data_editor(data_csv, num_rows="dynamic")
+        edited_df = st.data_editor(data_csv, num_rows="dynamic", hide_index=True)
+        # column_order=()
 
         if st.button('Готово', key='data'):
             # data.insert(0, 'ул. Горького, 18, Ступино, Московская обл., 142802')

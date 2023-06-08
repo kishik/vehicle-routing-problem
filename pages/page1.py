@@ -55,7 +55,7 @@ def calculate_time_list(places: list[tuple[int, float, float]], i: int):
 num_vehicles = int(st.number_input('Введите число бригадодней', value=15))
 service_time_avg = st.number_input('Введите среднее время одной работы в минутах', value=90)
 edited_df = st.session_state['key']
-edited_df = st.data_editor(edited_df, num_rows="dynamic")
+edited_df = st.data_editor(edited_df, num_rows="dynamic", hide_index=True)
 if st.button('Готово', key='coords'):
     with st.spinner('Идет составление расписания, пожалуйста подождите'):
         coords = edited_df.values.tolist()
