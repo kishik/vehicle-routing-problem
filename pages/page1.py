@@ -64,19 +64,23 @@ if st.button('Готово', key='coords'):
         print(coords_i)
         st.text(str(coords_i))
         # G = ox.graph_from_place('Московская область', network_type='drive')
-
         # G_speed = ox.speed.add_edge_speeds(G)
         # G_travel_time = ox.speed.add_edge_travel_times(G_speed)
-        G_travel_time = ox.io.load_graphml('data/graph.graphml')
+        if 'map' not in st.session_state:
+            st.session_state['map'] = ox.io.load_graphml('data/graph.graphml')
+        G_travel_time = st.session_state['map']
         custom_notification_box(icon='info', textDisplay='Загрузили карту Московской области',
-                                externalLink='more info', url='#', styles=styles, key="map_ready")
+                                externalLink='', url='#', styles=styles, key="map_ready")
         # ox.io.save_graph_geopackage(G_travel_time)
         # ox.io.save_graphml(G_travel_time)
         custom_notification_box(icon='info', textDisplay='Приступаем к матрице смежности',
-                                externalLink='more info', url='#', styles=styles, key="matrix_start")
+                                externalLink='shortest_path_length',
+                                url='https://networkx.org/documentation/stable/reference/algorithms/generated'
+                                    '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
+                                styles=styles, key="matrix_start")
         result = Parallel(n_jobs=-1)(delayed(calculate_time_list)(coords_i, i) for i in range(len(coords_i)))
         custom_notification_box(icon='info', textDisplay='Закончили с матрицей смежности',
-                                externalLink='more info', url='#', styles=styles, key="matrix_end")
+                                externalLink='', url='#', styles=styles, key="matrix_end")
         time_matrix = [result[i][1] for i in range(len(result))]
         minute_matrix = [[time_matrix[i][j] // 60 for j in range(len(time_matrix[0]))] for i in range(len(time_matrix))]
         service_time = [service_time_avg for i in range(len(time_matrix))]
@@ -177,12 +181,13 @@ if st.button('Готово', key='coords'):
             # Setting first solution heuristic.
             search_parameters = pywrapcp.DefaultRoutingSearchParameters()
             search_parameters.first_solution_strategy = (
-                routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
+                routing_enums_pb2.FirstSolutionStrategy.CHRISTOFIDES)
             # search_parameters.time_limit.seconds = 30
-
+            search_parameters.use_full_propagation = True
+            search_parameters.local_search_metaheuristic = (
+                routing_enums_pb2.LocalSearchMetaheuristic.SIMULATED_ANNEALING)
             # Solve the problem.
             solution = routing.SolveWithParameters(search_parameters)
-
             # Print solution on console.
             if solution:
                 print_solution(data, manager, routing, solution)
