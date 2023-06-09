@@ -134,7 +134,7 @@ if st.button('Готово', key='coords'):
                 # x.append(i)
                 st.text(plan_output)
                 total_time += solution.Min(time_var)
-            # print(times)
+            # print(indexes)
             # print(x)
             # fig, ax = plt.subplots()
             my_works = [len(indexes[i]) - 1 for i in range(len(indexes))]
