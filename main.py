@@ -42,8 +42,9 @@ def get_coordinates_row(row):
                         r.json()['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['Point'][
                             'pos'].split()))
     return lat, lon
-# title = st.text_input('Column name')
 
+
+st.session_state['mother_base'] = st.text_input('Введите адрес')
 
 uploaded_file = st.file_uploader("Choose a file")
 if uploaded_file is not None:
@@ -51,8 +52,8 @@ if uploaded_file is not None:
         # Can be used wherever a "file-like" object is accepted:
         data_csv = pd.read_csv(uploaded_file, encoding='cp1251',
                                dtype={17: str, 18: str, 19: str, 21: str, 22: str, 24: str, 26: str}, parse_dates=True)
-        data_csv.loc[:, 'date_start'] = pd.to_datetime(data_csv.loc[:, 'date_start'], format='%d.%m.%Y')
-        data_csv.loc[:, 'date_end'] = pd.to_datetime(data_csv.loc[:, 'date_end'], format='%d.%m.%Y')
+        data_csv.loc[:, 'date_start'] = pd.to_datetime(data_csv.loc[:, 'date_start'], format='%d.%m.%y')
+        data_csv.loc[:, 'date_end'] = pd.to_datetime(data_csv.loc[:, 'date_end'], format='%d.%m.%y')
         st.session_state['uploaded_data'] = data_csv
         data_start = st.date_input(
             "Начальная дата",
@@ -76,8 +77,17 @@ if uploaded_file is not None:
         if st.button('Готово', key='data'):
             # data.insert(0, 'ул. Горького, 18, Ступино, Московская обл., 142802')
             # coords = get_coordinates(list(edited_df['address']))
-            edited_df[['lat', 'lon']] = edited_df.apply(lambda row: get_coordinates_row(row['address']), axis='columns', result_type='expand')
+            addr = pd.DataFrame({
+                'date_start': pd.Timestamp(data_start),
+                'date_end': pd.Timestamp(data_finish),
+                'department': 'Ступинская',
+                'brigada': 'Ступинская-Горголя-1',
+                'address': st.session_state['mother_base']}, index=[0])
+            edited_df = pd.concat([addr, edited_df[:]])
+
+            edited_df[['lat', 'lon']] = edited_df.apply(lambda row: get_coordinates_row(row['address']), axis='columns',
+                                                        result_type='expand')
             # df = pd.DataFrame(coords)
-            edited_df = st.data_editor(edited_df, num_rows="dynamic")
+            # edited_df = st.data_editor(edited_df, num_rows="dynamic")
             st.session_state['key'] = edited_df
             switch_page("page1")

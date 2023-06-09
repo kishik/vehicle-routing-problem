@@ -58,10 +58,12 @@ edited_df = st.session_state['key']
 edited_df = st.data_editor(edited_df, num_rows="dynamic", hide_index=True)
 if st.button('Готово', key='coords'):
     with st.spinner('Идет составление расписания, пожалуйста подождите'):
+        count_df = edited_df.groupby(['date_start']).size().values.tolist()
+        print(count_df)
         coords = edited_df.values.tolist()
-        print(coords)
-        coords_i = [(i, coords[i][3], coords[i][4]) for i in range(len(coords))]
-        print(coords_i)
+        # print(coords)
+        coords_i = [(i, coords[i][-2], coords[i][-1]) for i in range(len(coords))]
+        # print(coords_i)
         st.text(str(coords_i))
         # G = ox.graph_from_place('Московская область', network_type='drive')
         # G_speed = ox.speed.add_edge_speeds(G)
@@ -85,6 +87,7 @@ if st.button('Готово', key='coords'):
         minute_matrix = [[time_matrix[i][j] // 60 for j in range(len(time_matrix[0]))] for i in range(len(time_matrix))]
         service_time = [service_time_avg for i in range(len(time_matrix))]
         service_time[0] = 0
+
         for i in range(len(minute_matrix)):
             for j in range(len(minute_matrix)):
                 minute_matrix[i][j] += service_time[j]
@@ -102,38 +105,64 @@ if st.button('Готово', key='coords'):
 
         def print_solution(data, manager, routing, solution):
             """Prints solution on console."""
-            times = []
-            x = []
+            # times = []
+            # x = []
             i = 0
+            indexes = []
             print(f'Objective: {solution.ObjectiveValue()}')
             time_dimension = routing.GetDimensionOrDie('Time')
             total_time = 0
             for vehicle_id in range(data['num_vehicles']):
                 index = routing.Start(vehicle_id)
                 plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
+                indexes.append([])
                 while not routing.IsEnd(index):
                     time_var = time_dimension.CumulVar(index)
                     plan_output += '{0} Time({1},{2}) -> '.format(
                         manager.IndexToNode(index), solution.Min(time_var),
                         solution.Max(time_var))
                     index = solution.Value(routing.NextVar(index))
+                    indexes[i].append(manager.IndexToNode(index))
                 time_var = time_dimension.CumulVar(index)
                 plan_output += '{0} Time({1},{2})\n'.format(manager.IndexToNode(index),
                                                             solution.Min(time_var),
                                                             solution.Max(time_var))
                 plan_output += 'Time of the route: {}min\n'.format(
                     solution.Min(time_var))
-                times.append(solution.Min(time_var))
+                # times.append(solution.Min(time_var))
                 i += 1
-                x.append(i)
+                # x.append(i)
                 st.text(plan_output)
                 total_time += solution.Min(time_var)
             # print(times)
             # print(x)
-            fig, ax = plt.subplots()
-
-            ax.plot(x, times, linewidth=2.0)
+            # fig, ax = plt.subplots()
+            my_works = [len(indexes[i]) - 1 for i in range(len(indexes))]
+            my_works = list(filter(lambda num: num != 0, my_works))
+            work_time = sum(my_works)
+            day_work = len(my_works)
+            old_work_time = sum(count_df)
+            old_day_work = len(count_df)
+            print(count_df)
+            print(my_works)
+            if len(my_works) < len(count_df):
+                my_works.extend([0] * (len(count_df) - len(my_works)))
+            elif len(my_works) > len(count_df):
+                count_df.extend([0] * (len(my_works) - len(count_df)))
+            # ax.plot(x, times, linewidth=2.0)
             st.text('Total time of all routes: {}min'.format(total_time))
+            df = {'Предложенное решение': my_works, 'Изначальное решение': count_df}
+            st.line_chart(df)
+            col1, col2, col3 = st.columns(3)
+
+            col1.metric(label="Среднее число задач в день", value=str(work_time / day_work),
+                        delta=str(work_time / day_work - old_work_time / old_day_work))
+            col2.metric(label="% рабочего и путевого времени",
+                        value=str(round(total_time / day_work / 8 / 60 * 100, 2)) + '%')
+            col3.metric(label="% рабочего времени",
+                        value=str(round((work_time * 90 / day_work / 8 / 60) * 100, 2)) + '%',
+                        delta=str(round(((work_time / day_work) - (old_work_time / old_day_work)) * 100 * 90 / 8 / 60))
+                              + '%')
 
 
         def main():
@@ -181,11 +210,13 @@ if st.button('Готово', key='coords'):
             # Setting first solution heuristic.
             search_parameters = pywrapcp.DefaultRoutingSearchParameters()
             search_parameters.first_solution_strategy = (
-                routing_enums_pb2.FirstSolutionStrategy.CHRISTOFIDES)
+                routing_enums_pb2.FirstSolutionStrategy.AUTOMATIC)
             # search_parameters.time_limit.seconds = 30
-            search_parameters.use_full_propagation = True
+            search_parameters.use_full_propagation = False
+            # search_parameters.time_limit.seconds = 180
+            search_parameters.log_search = True
             search_parameters.local_search_metaheuristic = (
-                routing_enums_pb2.LocalSearchMetaheuristic.SIMULATED_ANNEALING)
+                routing_enums_pb2.LocalSearchMetaheuristic.AUTOMATIC)
             # Solve the problem.
             solution = routing.SolveWithParameters(search_parameters)
             # Print solution on console.
