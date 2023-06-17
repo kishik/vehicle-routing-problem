@@ -1,3 +1,5 @@
+import math
+
 import streamlit as st
 import pandas as pd
 import osmnx as ox
@@ -39,6 +41,40 @@ def get_coordinates(names: list[str]) -> list[tuple[str, float, float]]:
                                 'pos'].split()))
         result.append((element, lat, lon))
     return result
+
+
+def split_big_work(df, time_matrix, work_times, working_day=480):
+    time_matrix = np.array(time_matrix)
+    for i in range(1, len(time_matrix)):
+        first_work_time = work_times[i]
+        # делим работу, пока она не укладывается в один день
+        while work_times[i] + time_matrix[0, i] + time_matrix[i, 0] > working_day:
+            delta = working_day - time_matrix[0, i] - time_matrix[i, 0]
+            work_times.append(delta)
+            work_times[i] -= delta
+
+            # далее делаем магию с time_matrix
+
+            # вставляем столбец
+            X = np.copy(time_matrix[:, i])
+            time_matrix = np.append(time_matrix, X, axis=1)
+
+            # вставляем строку
+            X = np.copy(time_matrix[i, :])
+            X = np.append(X, 0)
+            time_matrix = np.append(time_matrix, X)
+
+            df.append(df.iloc[i, :])
+            df.iloc[-1, 'time_norm'] = delta / 60
+            df.iloc[i, 'time_norm'] -= delta / 60
+
+
+def export_to_csv():
+    pass
+
+
+def working_days(start_date, finish_date):
+    pass
 
 
 def calculate_time_list(places: list[tuple[int, float, float]], i: int):
@@ -84,15 +120,19 @@ if st.button('Готово', key='coords'):
         custom_notification_box(icon='info', textDisplay='Закончили с матрицей смежности',
                                 externalLink='', url='#', styles=styles, key="matrix_end")
         time_matrix = [result[i][1] for i in range(len(result))]
-        minute_matrix = [[time_matrix[i][j] // 60 for j in range(len(time_matrix[0]))] for i in range(len(time_matrix))]
-        service_time = [service_time_avg for i in range(len(time_matrix))]
+        # print(time_matrix)
+        minute_matrix = [[math.ceil(time_matrix[i][j] / 60) for j in range(len(time_matrix[0]))] for i in range(len(time_matrix))]
+        # service_time = [service_time_avg for i in range(len(time_matrix))]
+        print(minute_matrix)
+        service_time = edited_df['time_norm'].astype(float).tolist()
+        service_time = [math.ceil(service_time[i] * 60) for i in range(len(service_time))]
         service_time[0] = 0
-
+        print(service_time)
         for i in range(len(minute_matrix)):
             for j in range(len(minute_matrix)):
                 minute_matrix[i][j] += service_time[j]
             minute_matrix[i][i] = 0
-
+        print(minute_matrix)
 
         def create_data_model():
             """Stores the data for the problem."""
@@ -100,6 +140,9 @@ if st.button('Готово', key='coords'):
             data['time_matrix'] = minute_matrix
             data['num_vehicles'] = num_vehicles
             data['depot'] = 0
+            # data['time_windows'] = [
+            #     (0, 480) for i in range(len(minute_matrix))  # 16
+            # ]
             return data
 
 
@@ -112,6 +155,7 @@ if st.button('Готово', key='coords'):
             print(f'Objective: {solution.ObjectiveValue()}')
             time_dimension = routing.GetDimensionOrDie('Time')
             total_time = 0
+            day_time = []
             for vehicle_id in range(data['num_vehicles']):
                 index = routing.Start(vehicle_id)
                 plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
@@ -129,6 +173,7 @@ if st.button('Готово', key='coords'):
                                                             solution.Max(time_var))
                 plan_output += 'Time of the route: {}min\n'.format(
                     solution.Min(time_var))
+                day_time.append(solution.Min(time_var))
                 # times.append(solution.Min(time_var))
                 i += 1
                 # x.append(i)
@@ -139,7 +184,12 @@ if st.button('Готово', key='coords'):
             # fig, ax = plt.subplots()
             my_works = [len(indexes[i]) - 1 for i in range(len(indexes))]
             my_works = list(filter(lambda num: num != 0, my_works))
-            work_time = sum(my_works)
+            new_work_time = [[service_time[j] for j in indexes[i]] for i in range(len(indexes))]
+            print(new_work_time)
+            new_work_time = [sum(new_work_time[i]) for i in range(len(new_work_time))]
+            print(new_work_time)
+            # work_time = sum(my_works)
+            work_time = sum(new_work_time)
             day_work = len(my_works)
             old_work_time = sum(count_df)
             old_day_work = len(count_df)
@@ -152,16 +202,18 @@ if st.button('Готово', key='coords'):
             # ax.plot(x, times, linewidth=2.0)
             st.text('Total time of all routes: {}min'.format(total_time))
             df = {'Предложенное решение': my_works, 'Изначальное решение': count_df}
+            df1 = {'Время работы': new_work_time[::-1], 'Время работы и пути': day_time[::-1]}
+            st.bar_chart(df1)
             st.line_chart(df)
             col1, col2, col3 = st.columns(3)
 
-            col1.metric(label="Среднее число задач в день", value=str(work_time / day_work),
-                        delta=str(work_time / day_work - old_work_time / old_day_work))
+            col1.metric(label="Среднее число задач в день", value=str(sum(my_works) / day_work),
+                        delta=str(sum(my_works) / day_work - old_work_time / old_day_work))
             col2.metric(label="% рабочего и путевого времени",
-                        value=str(round(total_time / day_work / 8 / 60 * 100, 2)) + '%')
+                        value=str(round(sum(new_work_time) / day_work / 8 / 60 * 100, 2)) + '%')
             col3.metric(label="% рабочего времени",
-                        value=str(round((work_time * 90 / day_work / 8 / 60) * 100, 2)) + '%',
-                        delta=str(round(((work_time / day_work) - (old_work_time / old_day_work)) * 100 * 90 / 8 / 60))
+                        value=str(round((sum(new_work_time) / day_work / 8 / 60) * 100, 2)) + '%',
+                        delta=str(round(((sum(new_work_time) / day_work) - (old_work_time / old_day_work)) * 100 * 90 / 8 / 60))
                               + '%')
 
 
@@ -194,12 +246,22 @@ if st.button('Готово', key='coords'):
             time = 'Time'
             routing.AddDimension(
                 transit_callback_index,
-                0,  # allow waiting time
+                30,  # allow waiting time
                 480,  # maximum time per vehicle
                 False,  # Don't force start cumul to zero.
                 time)
             time_dimension = routing.GetDimensionOrDie(time)
-
+            # for location_idx, time_window in enumerate(data['time_windows']):
+            #     if location_idx == data['depot']:
+            #         continue
+            #     index = manager.NodeToIndex(location_idx)
+            #     time_dimension.CumulVar(index).SetRange(time_window[0], time_window[1])
+            # depot_idx = data['depot']
+            # for vehicle_id in range(data['num_vehicles']):
+            #     index = routing.Start(vehicle_id)
+            #     time_dimension.CumulVar(index).SetRange(
+            #         data['time_windows'][depot_idx][0],
+            #         data['time_windows'][depot_idx][1])
             # Instantiate route start and end times to produce feasible times.
             for i in range(data['num_vehicles']):
                 routing.AddVariableMinimizedByFinalizer(

@@ -82,7 +82,9 @@ if uploaded_file is not None:
                 'date_end': pd.Timestamp(data_finish),
                 'department': 'Ступинская',
                 'brigada': 'Ступинская-Горголя-1',
-                'address': st.session_state['mother_base']}, index=[0])
+                'address': st.session_state['mother_base'],
+                'time_norm': 0
+                }, index=[0])
             edited_df = pd.concat([addr, edited_df[:]])
 
             edited_df[['lat', 'lon']] = edited_df.apply(lambda row: get_coordinates_row(row['address']), axis='columns',
