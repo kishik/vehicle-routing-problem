@@ -304,7 +304,8 @@ if st.button('Готово', key='coords'):
             # ax.plot(x, times, linewidth=2.0)
             st.text('Total time of all routes: {}min'.format(total_time))
             # df = {'Предложенное решение': my_works, 'Изначальное решение': count_df}
-            df1 = {'Время работы': new_work_time[::-1], 'Время работы и пути': day_time[::-1]}
+            new_work_time, day_time = zip(*sorted(zip(new_work_time, day_time), key=lambda x: x[1], reverse=True))
+            df1 = {'Время работы': new_work_time, 'Время работы и пути': day_time}
             st.bar_chart(df1)
             # st.line_chart(df)
             col1, col2, col3 = st.columns(3)
