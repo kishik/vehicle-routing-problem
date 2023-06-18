@@ -314,9 +314,9 @@ if st.button('Готово', key='coords'):
             col2.metric(label="% рабочего и путевого времени",
                         value=str(round(sum(day_time) / day_work / 8 / 60 * 100, 2)) + '%')
             col3.metric(label="% рабочего времени",
-                        value=str(round((sum(new_work_time) / day_work / 8 / 60) * 100, 2)) + '%',
-                        delta=str(round(((sum(new_work_time) / day_work)
-                                         - (old_work_time / old_day_work)) * 100 * 90 / 8 / 60)) + '%')
+                        value=str(round((sum(service_time) / day_work / 8 / 60) * 100, 2)) + '%',
+                        delta=str(round(((sum(service_time) / day_work)
+                                         - (sum(service_time) / old_day_work)) * 100 / 8 / 60)) + '%')
 
 
         def main():
