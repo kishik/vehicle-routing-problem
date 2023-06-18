@@ -34,7 +34,7 @@ def get_coordinates(names: list[str]) -> list[tuple[str, float, float]]:
         # except:
         r = requests.get('https://geocode-maps.yandex.ru/1.x',
                          params={'geocode': element, 'apikey': '2486ab02-2c39-4e68-8d2a-50c7deec2a70', 'format': 'json',
-                                 'bbox': '35.497,56.999~40.32,54.188'})
+                                 'bbox': '35.497,54.188~40.32,56.999'})
         lon, lat = list(map(float,
                             r.json()['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['Point'][
                                 'pos'].split()))
