@@ -94,15 +94,12 @@ def working_days(start_date, finish_date):
     pass
 
 
-def calculate_time_list(places: list[tuple[int, float, float]], i: int):
-    matrix = []
-    for j in range(len(places)):
-        matrix.append(int(nx.shortest_path_length(G_travel_time, source=ox.distance.nearest_nodes(
-            G_travel_time, places[i][2], places[i][1], return_dist=False),
-                                                  target=ox.distance.nearest_nodes(
-                                                      G_travel_time, places[j][2], places[j][1],
-                                                      return_dist=False), weight='travel_time')))
-    return i, matrix
+def calculate_time_list(places: list[int], i: int):
+    lenghts = nx.single_source_dijkstra_path_length(G_travel_time, places[i], cutoff=28800, weight='travel_time')
+    print('lenghts')
+    print(lenghts)
+    matrix = {place : lenghts[place] for place in places}
+    return matrix
 
 
 num_vehicles = int(st.number_input('Введите число бригадодней', value=15))
@@ -155,6 +152,13 @@ if st.button('Готово', key='coords'):
         coords = edited_df.values.tolist()
         # print(coords)
         coords_i = [(i, coords[i][-2], coords[i][-1]) for i in range(len(coords))]
+        # i : node number
+        works_num = {i: ox.distance.nearest_nodes(
+            G_travel_time, coords_i[i][2], coords_i[i][1], return_dist=False) for i in range(len(coords_i))}
+        # remove ununique node numbers
+        works_unique = list(set(works_num.values()))
+        # print(works_unique)
+        dicts_number = {works_unique[i]: i for i in range(len(works_unique))}
         # print(coords_i)
         st.text(str(coords_i))
         # G = ox.graph_from_place('Московская область', network_type='drive')
@@ -168,10 +172,19 @@ if st.button('Готово', key='coords'):
                                 url='https://networkx.org/documentation/stable/reference/algorithms/generated'
                                     '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
                                 styles=styles, key="matrix_start")
-        result = Parallel(n_jobs=-1)(delayed(calculate_time_list)(coords_i, i) for i in range(len(coords_i)))
+        result = Parallel(n_jobs=-1)(delayed(calculate_time_list)(works_unique, i) for i in range(len(works_unique)))
+        # i [distance to [0] [1]] node number
+        # time_matrix = [[works_unique[j] for j in range(len(coords_i))]]
+        # [i [distance to 0 1]] node number
+        #     from coords_i i to others
+        for i in range(len(coords_i)):
+            print(result[dicts_number[works_num[i]]])
+        time_matrix = [[result[dicts_number[works_num[i]]][works_num[j]]
+                        for j in range(len(coords_i))] for i in range(len(coords_i))]
+
         custom_notification_box(icon='info', textDisplay='Закончили с матрицей смежности',
                                 externalLink='', url='#', styles=styles, key="matrix_end")
-        time_matrix = [result[i][1] for i in range(len(result))]
+        # time_matrix = [result[i][1] for i in range(len(result))]
         # print(time_matrix)
         minute_matrix = [[math.ceil(time_matrix[i][j] / 60) for j in range(len(time_matrix[0]))] for i in
                          range(len(time_matrix))]
