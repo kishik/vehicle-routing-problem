@@ -125,60 +125,42 @@ if st.button('Готово', key='coords'):
                                 externalLink='', url='#', styles=styles, key="map_ready")
         edited_df.reset_index(inplace=True)
         basic_len = len(edited_df)
+        works_num = dict()
         for i, row in edited_df.iterrows():
             print(i)
+            works_num[i] = ox.distance.nearest_nodes(
+                G_travel_time, row['lon'], row['lat'], return_dist=False)
             row['time_norm'] = float(row['time_norm'])
-            if i == 0:
-                base_lat = row['lat']
-                base_lon = row['lon']
+            # if i == 0:
+            #     base_lat = row['lat']
+            #     base_lon = row['lon']
             time_norm = math.ceil(float(row['time_norm']) * 60)
-            time_from = math.ceil(int(nx.shortest_path_length(G_travel_time, source=ox.distance.nearest_nodes(
-                G_travel_time, base_lon, base_lat, return_dist=False),
-                                                              target=ox.distance.nearest_nodes(
-                                                                  G_travel_time, row['lon'], row['lat'],
-                                                                  return_dist=False), weight='travel_time')) / 60)
-            time_to = math.ceil(int(nx.shortest_path_length(G_travel_time, source=ox.distance.nearest_nodes(
-                G_travel_time, row['lon'], row['lat'], return_dist=False),
-                                                            target=ox.distance.nearest_nodes(
-                                                                G_travel_time, base_lon, base_lat,
-                                                                return_dist=False), weight='travel_time')) / 60)
+            time_from = math.ceil(int(nx.shortest_path_length(G_travel_time, source=works_num[0],
+                                                              target=works_num[i], weight='travel_time')) / 60)
+            time_to = math.ceil(int(nx.shortest_path_length(G_travel_time, source=works_num[i],
+                                                            target=works_num[0], weight='travel_time')) / 60)
             while time_norm + time_from + time_to > 480:
                 delta = 480 - time_from - time_to - 5
                 edited_df.loc[i, 'time_norm'] = float(edited_df.loc[i, 'time_norm']) - delta / 60
                 row['time_norm'] -= delta / 60
                 time_norm -= delta
                 print(row['time_norm'])
-
-                #         добавить строку копию
                 new_row = row.copy()
                 new_row['time_norm'] = delta / 60
-                # new_row[]
-                # df.loc[len(df)] = new_row
-                # df = df.append(new_row)
                 edited_df = pd.concat([edited_df, new_row.to_frame().T], ignore_index=True)
+                works_num[len(edited_df) - 1] = works_num[i]
         edited_df = st.data_editor(edited_df, num_rows="dynamic", hide_index=True)
 
         count_df = edited_df.groupby(['date_start']).size().values.tolist()
-        # print(count_df)
         coords = edited_df.values.tolist()
-        # print(coords)
         coords_i = [(i, coords[i][-2], coords[i][-1]) for i in range(len(coords))]
         # i : node number
-        works_num = {i: ox.distance.nearest_nodes(
-            G_travel_time, coords_i[i][2], coords_i[i][1], return_dist=False) for i in range(len(coords_i))}
+
         # remove ununique node numbers
         works_unique = list(set(works_num.values()))
-        # print(works_unique)
         dicts_number = {works_unique[i]: i for i in range(len(works_unique))}
-        # print(coords_i)
         st.text(str(coords_i))
         st.text(len(edited_df))
-        # G = ox.graph_from_place('Московская область', network_type='drive')
-        # G_speed = ox.speed.add_edge_speeds(G)
-        # G_travel_time = ox.speed.add_edge_travel_times(G_speed)
-
-        # ox.io.save_graph_geopackage(G_travel_time)
-        # ox.io.save_graphml(G_travel_time)
         custom_notification_box(icon='info', textDisplay='Приступаем к матрице смежности',
                                 externalLink='shortest_path_length',
                                 url='https://networkx.org/documentation/stable/reference/algorithms/generated'
