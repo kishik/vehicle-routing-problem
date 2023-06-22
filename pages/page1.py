@@ -109,6 +109,15 @@ edited_df = st.data_editor(edited_df, num_rows="dynamic", hide_index=True)
 if st.button('Готово', key='coords'):
     with st.spinner('Идет составление расписания, пожалуйста подождите'):
         st.text(edited_df['time_norm'].astype(float).sum() * 60)
+        edited_df['time_norm'] = edited_df['time_norm'].astype(float)
+        classic_work = edited_df.iloc[1:].groupby('date_start')['time_norm'].sum()
+        days = edited_df.iloc[1:].groupby('date_start').groups.keys()
+        print(classic_work)
+        classic_work = classic_work.tolist()
+        classic_work = [work * 60 for work in classic_work]
+        print(classic_work)
+        df1 = {'Время работы': classic_work, 'Дни': days}
+        st.bar_chart(df1, x='Дни', y='Время работы')
         if 'map' not in st.session_state:
             st.session_state['map'] = ox.io.load_graphml('data/graph.graphml')
         G_travel_time = st.session_state['map']
@@ -322,10 +331,12 @@ if st.button('Готово', key='coords'):
             st.text('Total time of all routes: {}min'.format(total_time))
             # df = {'Предложенное решение': my_works, 'Изначальное решение': count_df}
             new_work_time, day_time = zip(*sorted(zip(new_work_time, day_time), key=lambda x: x[1], reverse=True))
-            df1 = {'Время работы': new_work_time}
-            df2 = {'Время работы и пути': day_time}
-            st.bar_chart(df1)
-            st.bar_chart(df2)
+            # df1 = {'Время работы': new_work_time}
+            # df2 = {'Время работы и пути': day_time}
+            way_time = [day_time[i] - new_work_time[i] for i in range(len(day_time))]
+            df1 = {'Время работы': new_work_time, 'Время пути': way_time}
+            st.bar_chart(df1, y=('Время работы', 'Время пути'))
+            # st.bar_chart(df2)
             # st.line_chart(df)
             # col1, \
             col2, col3 = st.columns(2)
@@ -399,7 +410,7 @@ if st.button('Готово', key='coords'):
                 routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
             # search_parameters.time_limit.seconds = 30
             search_parameters.use_full_propagation = False
-            search_parameters.time_limit.seconds = 60
+            search_parameters.time_limit.seconds = 5
             search_parameters.log_search = True
             search_parameters.use_full_propagation = True
             search_parameters.local_search_metaheuristic = (
