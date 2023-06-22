@@ -49,6 +49,7 @@ st.session_state['mother_base'] = st.text_input('Введите адрес')
 uploaded_file = st.file_uploader("Choose a file")
 if uploaded_file is not None:
     with st.spinner('Wait for it...'):
+        # выделить в отдельную функцию
         # Can be used wherever a "file-like" object is accepted:
         data_csv = pd.read_csv(uploaded_file, encoding='cp1251',
                                dtype={17: str, 18: str, 19: str, 21: str, 22: str, 24: str, 26: str, 14: str, 15: str,
