@@ -96,13 +96,11 @@ def working_days(start_date, finish_date):
 
 def calculate_time_list(places: list[int], i: int):
     lenghts = nx.single_source_dijkstra_path_length(G_travel_time, places[i], cutoff=28800, weight='travel_time')
-    # print('lenghts')
-    # print(lenghts)
     matrix = {place: lenghts[place] for place in places}
     return matrix
 
 
-num_vehicles = int(st.number_input('Введите число бригадодней', value=15))
+# num_vehicles = int(st.number_input('Введите число бригадодней', value=15))
 # service_time_avg = st.number_input('Введите среднее время одной работы в минутах', value=90)
 edited_df = st.session_state['key']
 edited_df = st.data_editor(edited_df, num_rows="dynamic", hide_index=True)
@@ -118,6 +116,7 @@ if st.button('Готово', key='coords'):
         print(classic_work)
         df1 = {'Время работы в минутах': classic_work, 'Дни': days}
         st.bar_chart(df1, x='Дни', y='Время работы в минутах')
+        st.text('Количество рабочих дней: ' + str(len(days)))
         if 'map' not in st.session_state:
             st.session_state['map'] = ox.io.load_graphml('data/graph.graphml')
         G_travel_time = st.session_state['map']
@@ -195,6 +194,7 @@ if st.button('Готово', key='coords'):
         print('minute matrix')
         print(minute_matrix)
 
+        num_vehicles = len(edited_df)
 
         # делим большие работы на кусочки
         # split_big_work(edited_df, minute_matrix, service_time)
@@ -266,9 +266,10 @@ if st.button('Готово', key='coords'):
             time_dimension = routing.GetDimensionOrDie('Time')
             total_time = 0
             day_time = []
+            j = 0
             for vehicle_id in range(data['num_vehicles']):
                 index = routing.Start(vehicle_id)
-                plan_output = 'Route for vehicle {}:\n'.format(vehicle_id)
+                plan_output = 'Route for vehicle {}:\n'.format(j)
                 indexes.append([])
                 while not routing.IsEnd(index):
                     time_var = time_dimension.CumulVar(index)
@@ -287,7 +288,9 @@ if st.button('Готово', key='coords'):
                 # times.append(solution.Min(time_var))
                 i += 1
                 # x.append(i)
-                st.text(plan_output)
+                if solution.Min(time_var) > 0:
+                    j += 1
+                    st.text(plan_output)
                 total_time += solution.Min(time_var)
             # print(indexes)
             # print(x)
@@ -316,7 +319,7 @@ if st.button('Готово', key='coords'):
             # df1 = {'Время работы': new_work_time}
             # df2 = {'Время работы и пути': day_time}
             way_time = [day_time[i] - new_work_time[i] for i in range(len(day_time))]
-            df1 = {'Время работы в минутах': new_work_time, 'Время пути в минутах': way_time}
+            df1 = {'Время работы в минутах': new_work_time[:day_work], 'Время пути в минутах': way_time[:day_work]}
             st.bar_chart(df1, y=('Время работы в минутах', 'Время пути в минутах'))
             # st.bar_chart(df2)
             # st.line_chart(df)
