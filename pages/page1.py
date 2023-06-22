@@ -116,8 +116,8 @@ if st.button('Готово', key='coords'):
         classic_work = classic_work.tolist()
         classic_work = [work * 60 for work in classic_work]
         print(classic_work)
-        df1 = {'Время работы': classic_work, 'Дни': days}
-        st.bar_chart(df1, x='Дни', y='Время работы')
+        df1 = {'Время работы в минутах': classic_work, 'Дни': days}
+        st.bar_chart(df1, x='Дни', y='Время работы в минутах')
         if 'map' not in st.session_state:
             st.session_state['map'] = ox.io.load_graphml('data/graph.graphml')
         G_travel_time = st.session_state['map']
@@ -334,8 +334,8 @@ if st.button('Готово', key='coords'):
             # df1 = {'Время работы': new_work_time}
             # df2 = {'Время работы и пути': day_time}
             way_time = [day_time[i] - new_work_time[i] for i in range(len(day_time))]
-            df1 = {'Время работы': new_work_time, 'Время пути': way_time}
-            st.bar_chart(df1, y=('Время работы', 'Время пути'))
+            df1 = {'Время работы в минутах': new_work_time, 'Время пути в минутах': way_time}
+            st.bar_chart(df1, y=('Время работы в минутах', 'Время пути в минутах'))
             # st.bar_chart(df2)
             # st.line_chart(df)
             # col1, \
@@ -410,7 +410,7 @@ if st.button('Готово', key='coords'):
                 routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
             # search_parameters.time_limit.seconds = 30
             search_parameters.use_full_propagation = False
-            search_parameters.time_limit.seconds = 5
+            search_parameters.time_limit.seconds = 60
             search_parameters.log_search = True
             search_parameters.use_full_propagation = True
             search_parameters.local_search_metaheuristic = (
