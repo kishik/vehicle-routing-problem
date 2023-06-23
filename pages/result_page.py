@@ -18,12 +18,21 @@ from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 from joblib import Parallel, delayed
 from streamlit_extras.switch_page_button import switch_page
 from streamlit_custom_notification_box import custom_notification_box
+from streamlit_extras.app_logo import add_logo
 
 styles = {'material-icons': {'color': 'blue'},
           'text-icon-link-close-container': {'box-shadow': '#3896de 0px 4px'},
           'notification-text': {'': ''},
           'close-button': {'': ''},
           'link': {'': ''}}
+
+# if st.checkbox("Use url", value=True):
+#     add_logo("http://placekitten.com/120/120")
+# else:
+# add_logo("./mog_logo_ru_LB.jpeg")
+# st.write("👈 Check out the cat in the nav-bar!")
+image_path = 'mog_logo_ru_LB.jpeg'
+st.image(image_path, width=128)
 
 
 def get_coordinates(names: list[str]) -> list[tuple[str, float, float]]:
@@ -107,6 +116,7 @@ edited_df = st.data_editor(edited_df, num_rows="dynamic", hide_index=True)
 if st.button('Готово', key='coords'):
     with st.spinner('Идет составление расписания, пожалуйста подождите'):
         st.text(edited_df['time_norm'].astype(float).sum() * 60)
+        st.text(len(edited_df))
         edited_df['time_norm'] = edited_df['time_norm'].astype(float)
         classic_work = edited_df.iloc[1:].groupby('date_start')['time_norm'].sum()
         days = edited_df.iloc[1:].groupby('date_start').groups.keys()
@@ -114,6 +124,7 @@ if st.button('Готово', key='coords'):
         classic_work = classic_work.tolist()
         classic_work = [work * 60 for work in classic_work]
         print(classic_work)
+
         df1 = {'Время работы в минутах': classic_work, 'Дни': days}
         st.bar_chart(df1, x='Дни', y='Время работы в минутах')
         st.text('Количество рабочих дней: ' + str(len(days)))
@@ -319,22 +330,26 @@ if st.button('Готово', key='coords'):
             # df1 = {'Время работы': new_work_time}
             # df2 = {'Время работы и пути': day_time}
             way_time = [day_time[i] - new_work_time[i] for i in range(len(day_time))]
-            df1 = {'Время работы в минутах': new_work_time[:day_work], 'Время пути в минутах': way_time[:day_work]}
-            st.bar_chart(df1, y=('Время работы в минутах', 'Время пути в минутах'))
+            days = edited_df.iloc[1:].groupby('date_start').groups.keys()
+            df1 = {'Рабочие дни': list(days)[:day_work], 'Время работы в минутах': new_work_time[:day_work], 'Время пути в минутах': way_time[:day_work]}
+            st.bar_chart(df1, x='Рабочие дни', y=('Время работы в минутах', 'Время пути в минутах'))
             # st.bar_chart(df2)
             # st.line_chart(df)
             # col1, \
-            col2, col3 = st.columns(2)
+            col1, col2, col3, col4 = st.columns(4)
 
-            # col1.metric(label="Среднее число задач в день", value=str(basic_len / day_work),
-            #             delta=str(basic_len / day_work - basic_len / old_day_work))
+            col1.metric(label="Среднее число задач в день", value=str(basic_len / day_work),
+                        delta=str(basic_len / day_work - basic_len / len(days)))
             col2.metric(label="% рабочего и путевого времени",
                         value=str(round(sum(day_time) / day_work / 8 / 60 * 100, 2)) + '%')
             col3.metric(label="% рабочего времени",
-                        value=str(round((sum(service_time) / day_work / 8 / 60) * 100, 2)) + '%'
-                        # delta=str(round(((sum(service_time) / day_work)
-                        #                  - (sum(service_time) / old_day_work)) * 100 / 8 / 60)) + '%'
+                        value=str(round((sum(service_time) / day_work / 8 / 60) * 100, 2)) + '%',
+                        delta=str(round(((sum(service_time) / day_work)
+                                         - (sum(service_time) / len(days))) * 100 / 8 / 60)) + '%'
                         )
+            col1.metric(label="Число рабочих дней", value=str(day_work),
+                        delta=str(day_work - len(days)), delta_color="inverse")
+
 
 
         def main():
