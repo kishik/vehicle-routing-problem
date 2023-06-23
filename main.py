@@ -17,6 +17,19 @@ from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 from joblib import Parallel, delayed
 from streamlit_extras.switch_page_button import switch_page
 from streamlit_extras.app_logo import add_logo
+from st_pages import Page, show_pages, add_page_title
+
+# Optional -- adds the title and icon to the current page
+# add_page_title()
+
+# Specify what pages should be shown in the sidebar, and what their titles
+# and icons should be
+show_pages(
+    [
+        Page("main.py", "Ввод данных", "🏠"),
+        Page("pages/result_page.py", "Результат", ":books:"),
+    ]
+)
 
 
 # if st.checkbox("Use url", value=True):
@@ -26,8 +39,11 @@ from streamlit_extras.app_logo import add_logo
 # st.write("👈 Check out the cat in the nav-bar!")
 # image_path = 'mog_logo_ru_LB.jpeg'
 # st.image(image_path, width=128)
-if st.checkbox("Use url", value=True):
-    add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
+st.set_page_config(
+        page_title="Ввод данных",
+)
+# if st.checkbox("Use url", value=True):
+add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
 
 
 # def get_coordinates(names: list[str]) -> list[tuple[str, float, float]]:
@@ -117,4 +133,4 @@ if uploaded_file is not None:
                     # df = pd.DataFrame(coords)
                     # edited_df = st.data_editor(edited_df, num_rows="dynamic")
                     st.session_state['key'] = edited_df
-                    switch_page("result_page")
+                    switch_page("Результат")

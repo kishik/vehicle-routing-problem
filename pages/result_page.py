@@ -19,6 +19,22 @@ from joblib import Parallel, delayed
 from streamlit_extras.switch_page_button import switch_page
 from streamlit_custom_notification_box import custom_notification_box
 from streamlit_extras.app_logo import add_logo
+from st_pages import Page, show_pages, add_page_title
+
+# add_page_title()
+
+# Specify what pages should be shown in the sidebar, and what their titles
+# and icons should be
+show_pages(
+    [
+        Page("main.py", "Ввод данных", "🏠"),
+        Page("pages/result_page.py", "Результат", ":books:"),
+    ]
+)
+
+st.set_page_config(
+        page_title="Страница с результатами",
+)
 
 styles = {'material-icons': {'color': 'blue'},
           'text-icon-link-close-container': {'box-shadow': '#3896de 0px 4px'},
@@ -33,8 +49,8 @@ styles = {'material-icons': {'color': 'blue'},
 # st.write("👈 Check out the cat in the nav-bar!")
 # image_path = 'mog_logo_ru_LB.jpeg'
 # st.image(image_path, width=128)
-if st.checkbox("Use url", value=True):
-    add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
+# if st.checkbox("Use url", value=True):
+add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
 
 
 def get_coordinates(names: list[str]) -> list[tuple[str, float, float]]:
