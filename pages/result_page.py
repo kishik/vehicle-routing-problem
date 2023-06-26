@@ -27,14 +27,14 @@ from st_pages import Page, show_pages, add_page_title
 # and icons should be
 show_pages(
     [
-        Page("main.py", "Ввод данных", "🏠"),
-        Page("pages/result_page.py", "Результат", ":books:"),
+        Page("./main.py", "Ввод данных", "🏠"),
+        Page("./pages/result_page.py", "Результат", ":books:"),
     ]
 )
 
-st.set_page_config(
-        page_title="Страница с результатами",
-)
+# st.set_page_config(
+#         page_title="Страница с результатами",
+# )
 
 styles = {'material-icons': {'color': 'blue'},
           'text-icon-link-close-container': {'box-shadow': '#3896de 0px 4px'},

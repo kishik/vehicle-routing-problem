@@ -26,11 +26,11 @@ from st_pages import Page, show_pages, add_page_title
 # and icons should be
 show_pages(
     [
-        Page("main.py", "Ввод данных", "🏠"),
-        Page("pages/result_page.py", "Результат", ":books:"),
+        Page("./main.py", "Ввод данных", "🏠"),
+        Page("./pages/result_page.py", "Результат", ":books:"),
     ]
 )
-
+# add_page_title()
 
 # if st.checkbox("Use url", value=True):
 #     add_logo("http://placekitten.com/120/120")
@@ -39,9 +39,9 @@ show_pages(
 # st.write("👈 Check out the cat in the nav-bar!")
 # image_path = 'mog_logo_ru_LB.jpeg'
 # st.image(image_path, width=128)
-st.set_page_config(
-        page_title="Ввод данных",
-)
+# st.set_page_config(
+#         page_title="Ввод данных",
+# )
 # if st.checkbox("Use url", value=True):
 add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
 
