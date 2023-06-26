@@ -10,7 +10,7 @@ from geopy.geocoders import Nominatim
 from functools import partial
 from geopy import Photon
 import networkx as nx
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import requests
 from geopy import Yandex
 from matplotlib import pyplot as plt
@@ -46,6 +46,8 @@ styles = {'material-icons': {'color': 'blue'},
 # st.image(image_path, width=128)
 # if st.checkbox("Use url", value=True):
 add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
+
+
 # show_pages(
 #     [
 #         Page("diploma-dashboard/Ввод_данных.py", "Ввод данных", "🏠"),
@@ -226,6 +228,7 @@ if st.button('Готово', key='coords'):
 
         num_vehicles = len(edited_df)
 
+
         # делим большие работы на кусочки
         # split_big_work(edited_df, minute_matrix, service_time)
         # time_matrix = np.array(minute_matrix)
@@ -322,8 +325,32 @@ if st.button('Готово', key='coords'):
                     j += 1
                     st.text(plan_output)
                 total_time += solution.Min(time_var)
-            # print(indexes)
-            # print(x)
+            print(indexes)
+
+            # Сохраняем таблицу
+            global edited_df
+            # print(edited_df.info())
+            df = edited_df.reset_index(drop=True)
+            print(df.head())
+            df.drop(columns=['lat', 'lon'], index=0, inplace=True)
+            start_day = date(2023, 5, 1)
+
+            cols = list(df.columns.values)
+            cols = ['route_number', 'visiting_order'] + cols[:-2]
+
+            df = df.reindex(columns=cols)
+            df.sort_values(by=['route_number', 'visiting_order'], inplace=True)
+
+            for route_num, route in enumerate(indexes):
+                for count, value in enumerate(route):
+                    if value == 0:
+                        continue
+                    df.loc[value, 'route_number'] = route_num
+                    df.loc[value, 'date_start'] = df.loc[value, 'date_end'] = start_day + timedelta(days=count)
+                    df.loc[value, 'visiting_order'] = count
+            df = df.astype({"route_number": int, "visiting_order": int})
+            df.to_csv("result.csv", index=False)
+
             # fig, ax = plt.subplots()
             my_works = [len(indexes[i]) - 1 for i in range(len(indexes))]
             my_works = list(filter(lambda num: num != 0, my_works))
@@ -350,7 +377,8 @@ if st.button('Готово', key='coords'):
             # df2 = {'Время работы и пути': day_time}
             way_time = [day_time[i] - new_work_time[i] for i in range(len(day_time))]
             days = edited_df.iloc[1:].groupby('date_start').groups.keys()
-            df1 = {'Рабочие дни': list(days)[:day_work], 'Время работы в минутах': new_work_time[:day_work], 'Время пути в минутах': way_time[:day_work]}
+            df1 = {'Рабочие дни': list(days)[:day_work], 'Время работы в минутах': new_work_time[:day_work],
+                   'Время пути в минутах': way_time[:day_work]}
             st.bar_chart(df1, x='Рабочие дни', y=('Время работы в минутах', 'Время пути в минутах'))
             # st.bar_chart(df2)
             # st.line_chart(df)
@@ -368,7 +396,6 @@ if st.button('Готово', key='coords'):
                         )
             col1.metric(label="Число рабочих дней", value=str(day_work),
                         delta=str(day_work - len(days)), delta_color="inverse")
-
 
 
         def main():
@@ -441,5 +468,6 @@ if st.button('Готово', key='coords'):
                 print_solution(data, manager, routing, solution)
             else:
                 print('no solution')
+
 
         main()
