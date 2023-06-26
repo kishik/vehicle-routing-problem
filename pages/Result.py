@@ -116,8 +116,10 @@ def split_big_work(df, time_matrix, work_times, working_day=480):
             df.loc[i, 'time_norm'] -= delta / 60
 
 
-def export_to_csv():
-    pass
+@st.cache
+def convert_df(df):
+    # IMPORTANT: Cache the conversion to prevent computation on every rerun
+    return df.to_csv().encode('utf-8')
 
 
 def working_days(start_date, finish_date):
@@ -349,7 +351,14 @@ if st.button('Готово', key='coords'):
                     df.loc[value, 'date_start'] = df.loc[value, 'date_end'] = start_day + timedelta(days=count)
                     df.loc[value, 'visiting_order'] = count
             df = df.astype({"route_number": int, "visiting_order": int})
-            df.to_csv("result.csv", index=False)
+            csv = df.to_csv(index=False)
+
+            st.download_button(
+                label="Скчать расписание в формате CSV",
+                data=csv,
+                file_name='result.csv',
+                mime='text/csv',
+            )
 
             # fig, ax = plt.subplots()
             my_works = [len(indexes[i]) - 1 for i in range(len(indexes))]
