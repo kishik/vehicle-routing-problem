@@ -21,6 +21,17 @@ from st_pages import Page, show_pages, add_page_title
 import os
 
 
+# if 'visited' not in st.session_state:
+
+# st.session_state['visited'] = True
+# show_pages(
+#     [
+#         Page("diploma_dashboard/0_🌍_Ввод_данных.py", "base", "🏠"),
+#         Page("diploma_dashboard/pages/1_📈_Результат.py", "result", ":books:"),
+#     ]
+# )
+
+
 # Optional -- adds the title and icon to the current page
 # add_page_title()
 
@@ -133,11 +144,6 @@ if uploaded_file is not None:
                     # df = pd.DataFrame(coords)
                     # edited_df = st.data_editor(edited_df, num_rows="dynamic")
                     st.session_state['key'] = edited_df
-                    switch_page("Результат")
+                    switch_page("результат")
 
-# show_pages(
-#     [
-#         Page("diploma-dashboard/Ввод_данных.py", "Стартовая_страница", "🏠"),
-#         Page("diploma-dashboard/pages/Результат.py", "Результат", ":books:"),
-#     ]
-# )
+

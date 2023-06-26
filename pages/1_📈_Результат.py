@@ -48,8 +48,8 @@ styles = {'material-icons': {'color': 'blue'},
 add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
 # show_pages(
 #     [
-#         Page("diploma-dashboard/Ввод_данных.py", "Ввод данных", "🏠"),
-#         Page("pages/Результат.py", "Результат", ":books:"),
+#         Page("diploma-dashboard/0_🌍_Ввод_данных.py", "Ввод данных", "🏠"),
+#         Page("pages/1_📈_Результат.py", "Результат", ":books:"),
 #     ]
 # )
 

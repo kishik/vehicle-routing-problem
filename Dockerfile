@@ -12,4 +12,4 @@ COPY . /app
 
 ENTRYPOINT ["streamlit", "run"]
 
-CMD ["main.py"]
+CMD ["./0_??_Ввод_данных.py"]
