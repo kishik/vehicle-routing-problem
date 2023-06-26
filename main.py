@@ -18,6 +18,8 @@ from joblib import Parallel, delayed
 from streamlit_extras.switch_page_button import switch_page
 from streamlit_extras.app_logo import add_logo
 from st_pages import Page, show_pages, add_page_title
+import os
+
 
 # Optional -- adds the title and icon to the current page
 # add_page_title()
@@ -39,12 +41,15 @@ from st_pages import Page, show_pages, add_page_title
 # )
 # if st.checkbox("Use url", value=True):
 add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
+# if 'visited' not in st.session_state:
 show_pages(
     [
-        Page("main.py", "Ввод данных", "🏠"),
-        Page("pages/result_page.py", "Результат", ":books:"),
+        Page(os.path.abspath("main.py"), "Ввод данных", "🏠"),
+        Page("./pages/result_page.py", "Результат", ":books:"),
     ]
 )
+    # st.session_state['visited'] = True
+
 
 # def get_coordinates(names: list[str]) -> list[tuple[str, float, float]]:
 #     result = []
