@@ -24,12 +24,7 @@ from st_pages import Page, show_pages, add_page_title
 
 # Specify what pages should be shown in the sidebar, and what their titles
 # and icons should be
-show_pages(
-    [
-        Page("./main.py", "Ввод данных", "🏠"),
-        Page("./pages/result_page.py", "Результат", ":books:"),
-    ]
-)
+
 # add_page_title()
 
 # if st.checkbox("Use url", value=True):
@@ -44,7 +39,12 @@ show_pages(
 # )
 # if st.checkbox("Use url", value=True):
 add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
-
+show_pages(
+    [
+        Page("main.py", "Ввод данных", "🏠"),
+        Page("pages/result_page.py", "Результат", ":books:"),
+    ]
+)
 
 # def get_coordinates(names: list[str]) -> list[tuple[str, float, float]]:
 #     result = []
@@ -133,4 +133,4 @@ if uploaded_file is not None:
                     # df = pd.DataFrame(coords)
                     # edited_df = st.data_editor(edited_df, num_rows="dynamic")
                     st.session_state['key'] = edited_df
-                    switch_page("Результат")
+                    switch_page("результат")

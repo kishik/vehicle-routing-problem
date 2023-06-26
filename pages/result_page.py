@@ -25,15 +25,10 @@ from st_pages import Page, show_pages, add_page_title
 
 # Specify what pages should be shown in the sidebar, and what their titles
 # and icons should be
-show_pages(
-    [
-        Page("./main.py", "Ввод данных", "🏠"),
-        Page("./pages/result_page.py", "Результат", ":books:"),
-    ]
-)
+
 
 # st.set_page_config(
-#         page_title="Страница с результатами",
+#         page_title="Результат",
 # )
 
 styles = {'material-icons': {'color': 'blue'},
@@ -51,6 +46,12 @@ styles = {'material-icons': {'color': 'blue'},
 # st.image(image_path, width=128)
 # if st.checkbox("Use url", value=True):
 add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
+# show_pages(
+#     [
+#         Page("diploma-dashboard/main.py", "Ввод данных", "🏠"),
+#         Page("pages/result_page.py", "Результат", ":books:"),
+#     ]
+# )
 
 
 def get_coordinates(names: list[str]) -> list[tuple[str, float, float]]:
