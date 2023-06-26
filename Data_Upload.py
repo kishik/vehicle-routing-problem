@@ -26,8 +26,8 @@ import os
 # st.session_state['visited'] = True
 # show_pages(
 #     [
-#         Page("diploma_dashboard/0_🌍_Ввод_данных.py", "base", "🏠"),
-#         Page("diploma_dashboard/pages/1_📈_Результат.py", "result", ":books:"),
+#         Page("diploma_dashboard/Data_Upload.py", "base", "🏠"),
+#         Page("diploma_dashboard/pages/Result.py", "result", ":books:"),
 #     ]
 # )
 
@@ -144,6 +144,6 @@ if uploaded_file is not None:
                     # df = pd.DataFrame(coords)
                     # edited_df = st.data_editor(edited_df, num_rows="dynamic")
                     st.session_state['key'] = edited_df
-                    switch_page("результат")
+                    switch_page("result")
 
 
