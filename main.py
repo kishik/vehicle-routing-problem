@@ -44,7 +44,7 @@ add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
 # if 'visited' not in st.session_state:
 show_pages(
     [
-        Page(os.path.abspath("main.py"), "Ввод данных", "🏠"),
+        Page(os.path.abspath("./main.py"), "Ввод данных", "🏠"),
         Page("./pages/result_page.py", "Результат", ":books:"),
     ]
 )
