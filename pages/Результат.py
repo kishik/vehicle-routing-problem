@@ -329,26 +329,27 @@ if st.button('Готово', key='coords'):
 
             # Сохраняем таблицу
             global edited_df
-            # print(edited_df.info())
+            inds = list(filter(lambda i: i != [0], indexes))
+
             df = edited_df.reset_index(drop=True)
-            print(df.head())
+            print(334, df.columns.values)
             df.drop(columns=['lat', 'lon'], index=0, inplace=True)
-            start_day = date(2023, 5, 1)
+            dates = sorted(df.date_start.unique())
 
-            cols = list(df.columns.values)
-            cols = ['route_number', 'visiting_order'] + cols[:-2]
-
-            df = df.reindex(columns=cols)
-            df.sort_values(by=['route_number', 'visiting_order'], inplace=True)
-
-            for route_num, route in enumerate(indexes):
+            for date_num, route in enumerate(inds):
                 for count, value in enumerate(route):
                     if value == 0:
                         continue
-                    df.loc[value, 'route_number'] = route_num
-                    df.loc[value, 'date_start'] = df.loc[value, 'date_end'] = start_day + timedelta(days=count)
+                    df.loc[value, 'date_number'] = date_num
+                    df.loc[value, 'date_start'] = df.loc[value, 'date_end'] = dates[date_num]
                     df.loc[value, 'visiting_order'] = count
-            df = df.astype({"route_number": int, "visiting_order": int})
+            df = df.astype({"date_number": int, "visiting_order": int})
+
+            cols = list(df.columns.values)
+            cols = ['date_number', 'visiting_order'] + cols[:-2]
+            df = df.reindex(columns=cols)
+
+            df.sort_values(by=['date_number', 'visiting_order'], inplace=True)
             df.to_csv("result.csv", index=False)
 
             # fig, ax = plt.subplots()
