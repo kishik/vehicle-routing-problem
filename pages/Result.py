@@ -352,13 +352,6 @@ if st.button('Готово', key='coords'):
             df.sort_values(by=['date_number', 'visiting_order'], inplace=True)
             csv = df.to_csv(index=False)
 
-            st.download_button(
-                label="Скчать расписание в формате CSV",
-                data=csv,
-                file_name='result.csv',
-                mime='text/csv',
-            )
-
             # fig, ax = plt.subplots()
             my_works = [len(indexes[i]) - 1 for i in range(len(indexes))]
             my_works = list(filter(lambda num: num != 0, my_works))
@@ -404,6 +397,13 @@ if st.button('Готово', key='coords'):
                         )
             col1.metric(label="Число рабочих дней", value=str(day_work),
                         delta=str(day_work - len(days)), delta_color="inverse")
+
+            st.download_button(
+                label="Скчать расписание в формате CSV",
+                data=csv,
+                file_name='result.csv',
+                mime='text/csv',
+            )
 
 
         def main():
