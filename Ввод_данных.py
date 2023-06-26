@@ -42,12 +42,7 @@ import os
 # if st.checkbox("Use url", value=True):
 add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
 # if 'visited' not in st.session_state:
-show_pages(
-    [
-        Page(os.path.abspath("main.py"), "Ввод данных", "🏠"),
-        Page("./pages/result_page.py", "Результат", ":books:"),
-    ]
-)
+
     # st.session_state['visited'] = True
 
 
@@ -138,4 +133,11 @@ if uploaded_file is not None:
                     # df = pd.DataFrame(coords)
                     # edited_df = st.data_editor(edited_df, num_rows="dynamic")
                     st.session_state['key'] = edited_df
-                    switch_page("результат")
+                    switch_page("Результат")
+
+# show_pages(
+#     [
+#         Page("diploma-dashboard/Ввод_данных.py", "Стартовая_страница", "🏠"),
+#         Page("diploma-dashboard/pages/Результат.py", "Результат", ":books:"),
+#     ]
+# )
