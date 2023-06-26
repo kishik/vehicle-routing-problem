@@ -28,7 +28,7 @@ from st_pages import Page, show_pages, add_page_title
 
 
 # st.set_page_config(
-#         page_title="Результат",
+#         page_title="Результат2222",
 # )
 
 styles = {'material-icons': {'color': 'blue'},
@@ -48,8 +48,8 @@ styles = {'material-icons': {'color': 'blue'},
 add_logo("https://mosoblgaz.ru/local/html/assets/images/n-logo-p.svg")
 # show_pages(
 #     [
-#         Page("diploma-dashboard/main.py", "Ввод данных", "🏠"),
-#         Page("pages/result_page.py", "Результат", ":books:"),
+#         Page("diploma-dashboard/Ввод_данных.py", "Ввод данных", "🏠"),
+#         Page("pages/Результат.py", "Результат", ":books:"),
 #     ]
 # )
 
