@@ -90,7 +90,8 @@ if uploaded_file is not None:
             with st.spinner('Wait for it...'):
                 data_csv.loc[:, 'date_start'] = pd.to_datetime(data_csv.loc[:, 'date_start'], format='%Y-%m-%d')
                 data_csv.loc[:, 'date_end'] = pd.to_datetime(data_csv.loc[:, 'date_end'], format='%Y-%m-%d')
-                data_csv.loc[:, 'time_norm'] = data_csv.loc[:, 'time_norm'].astype(float)
+                data_csv.loc[:, 'time_norm'] = data_csv.loc[:, 'time_norm'].astype(float) / 6
+                # FIXME выдает ошибку если мало дат и много работ в изначальном решении
 
                 st.session_state['uploaded_data'] = data_csv
                 data_start = st.date_input(
