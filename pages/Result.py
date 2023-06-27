@@ -5,18 +5,14 @@ import osmnx as ox
 import sklearn
 import numpy as np
 import geopandas as gpd
-import taxicab as tc
-from geopy.geocoders import Nominatim
+# import taxicab as tc
 from functools import partial
-from geopy import Photon
 import networkx as nx
 from datetime import datetime, date, timedelta
 import requests
-from geopy import Yandex
 from matplotlib import pyplot as plt
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 from joblib import Parallel, delayed
-from streamlit_extras.switch_page_button import switch_page
 from streamlit_custom_notification_box import custom_notification_box
 from streamlit_extras.app_logo import add_logo
 from st_pages import Page, show_pages, add_page_title
@@ -120,16 +116,14 @@ if st.button('Готово', key='coords'):
             works_num[i] = ox.distance.nearest_nodes(
                 G_travel_time, row['lon'], row['lat'], return_dist=False)
             row['time_norm'] = float(row['time_norm'])
-            # if i == 0:
-            #     base_lat = row['lat']
-            #     base_lon = row['lon']
+
             time_norm = math.ceil(float(row['time_norm']) * 60)
             time_from = math.ceil(int(nx.shortest_path_length(G_travel_time, source=works_num[0],
                                                               target=works_num[i], weight='travel_time')) / 60)
             time_to = math.ceil(int(nx.shortest_path_length(G_travel_time, source=works_num[i],
                                                             target=works_num[0], weight='travel_time')) / 60)
             while time_norm + time_from + time_to > 480:
-                delta = 480 - time_from - time_to - 5
+                delta = 480 - time_from - time_to - 3
                 edited_df.loc[i, 'time_norm'] = float(edited_df.loc[i, 'time_norm']) - delta / 60
                 row['time_norm'] -= delta / 60
                 time_norm -= delta
@@ -180,54 +174,6 @@ if st.button('Готово', key='coords'):
 
         num_vehicles = len(edited_df)
 
-        # делим большие работы на кусочки
-        # split_big_work(edited_df, minute_matrix, service_time)
-        # time_matrix = np.array(minute_matrix)
-        # print(time_matrix)
-        # work_times = minute_matrix
-        # working_day = 480
-        # i = 1
-        # delta = working_day - (time_matrix[0, i] + time_matrix[i, 0] - work_times[i])
-        # work_times.append(delta)
-        # work_times[i] -= delta
-        # # нужно запоминать номера уже добавленных строк из этой строки
-        # # далее делаем магию с time_matrix
-        # # вычитать дельту!!!!!!!!!!!!!!
-        # # вставляем столбец
-        # X = np.copy(time_matrix[:, i])
-        # time_matrix = np.append(time_matrix, np.expand_dims(X, axis=1), axis=1)
-        #
-        # # вставляем строку
-        # X = np.copy(time_matrix[i, :])
-        # # X = np.append(X, 0)
-        # # print(np.expand_dims(X, axis=0))
-        # # print(type(X))
-        # # print(type(time_matrix))
-        # # print(time_matrix)
-        # time_matrix = np.append(time_matrix, np.expand_dims(X, axis=0), axis=0)
-        #
-        # # дальше перебрать две колонки
-        # # вычитаем уменьшение работы
-        # time_matrix[:, i] = time_matrix[:, i] - delta
-        # time_matrix[i, i] = 0
-        # # уже вычли дельту
-        # time_matrix[-1, i] = work_times[i]
-        # # переходим к колонке -1
-        # # это все можно сделать сразу после получения df!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # print(time_matrix)
-        # # df.reset_index(inplace=True)
-        # new_row = edited_df.iloc[i].copy()
-        # # new_row[]
-        # # df.loc[len(df)] = new_row
-        # # df = df.append(new_row)
-        # df = pd.concat([edited_df, new_row.to_frame().T], ignore_index=True)
-        # # print(new_row)
-        # # print(type(new_row))
-        # # print(df)
-        # df.loc[-1, 'time_norm'] = delta / 60
-        # df.loc[i, 'time_norm'] -= delta / 60
-        # print(df)
-
 
         def create_data_model():
             """Stores the data for the problem."""
@@ -264,7 +210,7 @@ if st.button('Готово', key='coords'):
                     index = solution.Value(routing.NextVar(index))
                     indexes[i].append(manager.IndexToNode(index))
                 time_var = time_dimension.CumulVar(index)
-                plan_output += 'Точка{0} Время({1},{2})\n'.format(manager.IndexToNode(index),
+                plan_output += 'Точка {0} Время({1},{2})\n'.format(manager.IndexToNode(index),
                                                             solution.Min(time_var),
                                                             solution.Max(time_var))
                 plan_output += 'Время маршрута: {}min\n'.format(
@@ -304,14 +250,10 @@ if st.button('Готово', key='coords'):
             df.sort_values(by=['date_number', 'visiting_order'], inplace=True)
             csv = df.to_csv(index=False)
 
-            # fig, ax = plt.subplots()
             my_works = [len(indexes[i]) - 1 for i in range(len(indexes))]
             my_works = list(filter(lambda num: num != 0, my_works))
             new_work_time = [[service_time[j] for j in indexes[i]] for i in range(len(indexes))]
-            # print(new_work_time)
             new_work_time = [sum(new_work_time[i]) for i in range(len(new_work_time))]
-            # print(new_work_time)
-            # work_time = sum(my_works)
             work_time = sum(new_work_time)
             day_work = len(my_works)
             old_work_time = sum(count_df)
@@ -340,7 +282,7 @@ if st.button('Готово', key='coords'):
                         delta=str(round(((sum(service_time) / day_work)
                                          - (sum(service_time) / len(days))) * 100 / 8 / 60)) + '%'
                         )
-            col1.metric(label="Число рабочих дней", value=str(day_work),
+            col4.metric(label="Число рабочих дней", value=str(day_work),
                         delta=str(day_work - len(days)), delta_color="inverse")
 
             st.download_button(

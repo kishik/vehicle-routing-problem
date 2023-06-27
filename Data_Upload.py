@@ -71,7 +71,7 @@ def get_coordinates_row(row):
 def get_file():
     return pd.read_csv(uploaded_file,
                        dtype={17: str, 18: str, 19: str, 21: str, 22: str, 24: str, 26: str, 14: str, 15: str,
-                              29: str, 31: str, 32: str, 33: str}, parse_dates=True)
+                              29: str, 31: str, 32: str, 33: str}, parse_dates=True, encoding='cp1251')
 
 
 st.session_state['mother_base'] = st.text_input('Введите адрес')
@@ -90,7 +90,7 @@ if uploaded_file is not None:
             with st.spinner('Wait for it...'):
                 data_csv.loc[:, 'date_start'] = pd.to_datetime(data_csv.loc[:, 'date_start'], format='%Y-%m-%d')
                 data_csv.loc[:, 'date_end'] = pd.to_datetime(data_csv.loc[:, 'date_end'], format='%Y-%m-%d')
-                data_csv.loc[:, 'time_norm'] = data_csv.loc[:, 'time_norm'].astype(float) / 6
+                data_csv.loc[:, 'time_norm'] = data_csv.loc[:, 'time_norm'].astype(float)
 
                 st.session_state['uploaded_data'] = data_csv
                 data_start = st.date_input(
