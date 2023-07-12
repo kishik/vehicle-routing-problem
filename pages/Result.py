@@ -16,6 +16,7 @@ from joblib import Parallel, delayed
 from streamlit_custom_notification_box import custom_notification_box
 from streamlit_extras.app_logo import add_logo
 from st_pages import Page, show_pages, add_page_title
+import networkit as nk
 
 # add_page_title()
 
@@ -104,7 +105,7 @@ if st.button('Готово', key='coords'):
         st.bar_chart(df1, x='Дни', y='Время работы в минутах')
         st.text('Количество рабочих дней: ' + str(len(days)))
         if 'map' not in st.session_state:
-            st.session_state['map'] = ox.io.load_graphml('data/graph.graphml')
+            st.session_state['map'] = nk.readGraph('data/graph.graphml', nk.Format.GML)
         G_travel_time = st.session_state['map']
         custom_notification_box(icon='info', textDisplay='Загрузили карту Московской области',
                                 externalLink='', url='#', styles=styles, key="map_ready")
@@ -149,11 +150,9 @@ if st.button('Готово', key='coords'):
                                 url='https://networkx.org/documentation/stable/reference/algorithms/generated'
                                     '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
                                 styles=styles, key="matrix_start")
+        print(nk.distance.MultiTargetDijkstra(G_travel_time, works_unique[0], works_unique[1:]).getDistances())
         result = Parallel(n_jobs=-1)(delayed(calculate_time_list)(works_unique, i) for i in range(len(works_unique)))
-        # i [distance to [0] [1]] node number
-        # time_matrix = [[works_unique[j] for j in range(len(coords_i))]]
-        # [i [distance to 0 1]] node number
-        #     from coords_i i to others
+
         time_matrix = [[result[dicts_number[works_num[i]]][works_num[j]]
                         for j in range(len(coords_i))] for i in range(len(coords_i))]
 
