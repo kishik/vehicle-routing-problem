@@ -198,8 +198,10 @@ if st.button('Готово', key='coords'):
             total_time = 0
             day_time = []
             j = 1
+            plan_outputs = []
             for vehicle_id in range(data['num_vehicles']):
                 index = routing.Start(vehicle_id)
+
                 plan_output = 'Маршрут для бригады {}:\n'.format(j)
                 indexes.append([])
                 while not routing.IsEnd(index):
@@ -210,7 +212,7 @@ if st.button('Готово', key='coords'):
                     index = solution.Value(routing.NextVar(index))
                     indexes[i].append(manager.IndexToNode(index))
                 time_var = time_dimension.CumulVar(index)
-                plan_output += 'Точка {0} Время({1},{2})\n'.format(manager.IndexToNode(index),
+                plan_output += '{0} Время({1},{2})\n'.format(manager.IndexToNode(index),
                                                             solution.Min(time_var),
                                                             solution.Max(time_var))
                 plan_output += 'Время маршрута: {}min\n'.format(
@@ -218,13 +220,17 @@ if st.button('Готово', key='coords'):
                 day_time.append(solution.Min(time_var))
                 # times.append(solution.Min(time_var))
                 i += 1
+                plan_outputs.append((plan_output, solution.Min(time_var)))
                 # x.append(i)
-                if solution.Min(time_var) > 0:
-                    j += 1
-                    st.text(plan_output)
+                # if solution.Min(time_var) > 0:
+                #     j += 1
+                #     st.text(plan_output)
                 total_time += solution.Min(time_var)
-            print(indexes)
-
+            # print(indexes)
+            plan_outputs = sorted(plan_outputs, key=lambda x: x[1], reverse=True)
+            for route, time in plan_outputs:
+                if time > 0:
+                    st.text(route)
             # Сохраняем таблицу
             global edited_df
             inds = list(filter(lambda i: i != [0], indexes))
