@@ -197,7 +197,7 @@ if st.button('Готово', key='coords'):
             time_dimension = routing.GetDimensionOrDie('Time')
             total_time = 0
             day_time = []
-            j = 0
+            j = 1
             for vehicle_id in range(data['num_vehicles']):
                 index = routing.Start(vehicle_id)
                 plan_output = 'Маршрут для бригады {}:\n'.format(j)
