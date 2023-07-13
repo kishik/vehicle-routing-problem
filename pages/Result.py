@@ -1,3 +1,4 @@
+import copy
 import math
 import streamlit as st
 import pandas as pd
@@ -163,6 +164,8 @@ if st.button('Готово', key='coords'):
         minute_matrix = [[math.ceil(time_matrix[i][j] / 60) for j in range(len(time_matrix[0]))] for i in
                          range(len(time_matrix))]
 
+        path_minute_matrix = copy.deepcopy(minute_matrix)
+
         service_time = edited_df['time_norm'].astype(float).tolist()
         service_time = [math.ceil(service_time[i] * 60) for i in range(len(service_time))]
         service_time[0] = 0
@@ -193,7 +196,7 @@ if st.button('Готово', key='coords'):
             # x = []
             i = 0
             indexes = []
-            print(f'Objective: {solution.ObjectiveValue()}')
+            # print(f'Objective: {solution.ObjectiveValue()}')
             time_dimension = routing.GetDimensionOrDie('Time')
             total_time = 0
             day_time = []
@@ -235,30 +238,35 @@ if st.button('Готово', key='coords'):
                     text = 'Маршрут в {} день:\n'.format(j) + route
                     j += 1
                     st.text(text)
-            # Сохраняем таблицу
 
-            inds = list(filter(lambda i: i != [0], indexes))
+            # Сохраняем таблицу
+            inds = list(filter(lambda ind: ind != [0], indexes))
 
             df = edited_df.reset_index(drop=True)
-            print(334, df.columns.values)
-            df.drop(columns=['lat', 'lon'], index=0, inplace=True)
+            print(246, df.columns.values)
+            # index=0 - удаляем первую строку
+            df.drop(columns=['lat', 'lon', 'index'], index=0, inplace=True)
             dates = sorted(df.date_start.unique())
 
+            prev = 0
             for date_num, route in enumerate(inds):
-                for count, value in enumerate(route):
-                    if value == 0:
+                for count, index in enumerate(route):
+                    if index == 0:
+                        prev = 0
                         continue
-                    df.loc[value, 'date_number'] = date_num
-                    df.loc[value, 'date_start'] = df.loc[value, 'date_end'] = dates[date_num]
-                    df.loc[value, 'visiting_order'] = count
+                    df.loc[index, 'date_number'] = date_num
+                    df.loc[index, 'date_start'] = df.loc[index, 'date_end'] = dates[date_num]
+                    df.loc[index, 'visiting_order'] = count
+                    df.loc[index, 'travel_time'] = path_minute_matrix[prev][index]
+                    prev = index
             df = df.astype({"date_number": int, "visiting_order": int})
 
             cols = list(df.columns.values)
-            cols = ['date_number', 'visiting_order'] + cols[:-2]
+            cols = ['date_number', 'visiting_order', 'travel_time'] + cols[:-3]
             df = df.reindex(columns=cols)
 
             df.sort_values(by=['date_number', 'visiting_order'], inplace=True)
-            csv = df.to_csv(index=False)
+            csv = df.to_csv(index=False, sep=';')
 
             my_works = [len(indexes[i]) - 1 for i in range(len(indexes))]
             my_works = list(filter(lambda num: num != 0, my_works))
