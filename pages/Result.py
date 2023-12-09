@@ -353,7 +353,7 @@ if st.button('Готово', key='coords'):
                     j += 1
                 #     st.text(plan_output)
                 total_time += solution.Min(time_var)
-                if (vehicle_id // int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))) > 0 and (vehicle_id % int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))) == 0 and total_time > 0:
+                if (vehicle_id % int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))) == (int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) - 1) and total_time > 0:
                     st.text(f"Общее время: {total_time}")
                     total_time = 0
 
