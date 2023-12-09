@@ -77,7 +77,10 @@ def export_to_csv():
 
 
 def working_days(start_date, finish_date):
-    pass
+    # numpy.busdaycalendar.holidays добавлять праздники
+    print(np.datetime64(finish_date))
+    print(np.datetime64(finish_date) + np.timedelta64(1,'D'))
+    return np.busday_count(np.datetime64(start_date), np.datetime64(finish_date) + np.timedelta64(1,'D'))
 
 
 def calculate_time_list(places: list[int], i: int):
@@ -89,6 +92,8 @@ def calculate_time_list(places: list[int], i: int):
 edited_df = st.session_state['key']
 edited_df = st.data_editor(edited_df, num_rows="dynamic", hide_index=True)
 if st.button('Готово', key='coords'):
+    edited_df['date_start'] = pd.to_datetime(edited_df['date_start']).dt.date
+    edited_df['date_end'] = pd.to_datetime(edited_df['date_end']).dt.date
     with st.spinner('Идет составление расписания, пожалуйста подождите'):
         st.text(edited_df['time_norm'].astype(float).sum() * 60)
         st.text(len(edited_df))
@@ -99,7 +104,8 @@ if st.button('Готово', key='coords'):
         classic_work = classic_work.tolist()
         classic_work = [work * 60 for work in classic_work]
         print(classic_work)
-
+        brigades_num = len(edited_df['brigada'].unique())
+        print(f'brigades num {brigades_num}')
         df1 = {'Время работы в минутах': classic_work, 'Дни': days}
         st.bar_chart(df1, x='Дни', y='Время работы в минутах')
         st.text('Количество рабочих дней: ' + str(len(days)))
@@ -114,7 +120,7 @@ if st.button('Готово', key='coords'):
         for i, row in edited_df.iterrows():
             print(i)
             works_num[i] = ox.distance.nearest_nodes(
-                G_travel_time, row['lon'], row['lat'], return_dist=False)
+                G_travel_time, row['addr_lon'], row['addr_lat'], return_dist=False)
             row['time_norm'] = float(row['time_norm'])
 
             time_norm = math.ceil(float(row['time_norm']) * 60)
@@ -172,14 +178,16 @@ if st.button('Готово', key='coords'):
                 minute_matrix[i][j] += service_time[j]
             minute_matrix[i][i] = 0
 
-        num_vehicles = len(edited_df)
-
+        print(f"days {working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])}")
+        
+        num_vehicles = brigades_num * working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])
+        print(f"num {num_vehicles}")
 
         def create_data_model():
             """Stores the data for the problem."""
             data = {}
             data['time_matrix'] = minute_matrix
-            data['num_vehicles'] = num_vehicles
+            data['num_vehicles'] = int(num_vehicles)
             data['depot'] = 0
             # data['time_windows'] = [
             #     (0, 480) for i in range(len(minute_matrix))  # 16
@@ -241,7 +249,7 @@ if st.button('Готово', key='coords'):
 
             df = edited_df.reset_index(drop=True)
             print(334, df.columns.values)
-            df.drop(columns=['lat', 'lon'], index=0, inplace=True)
+            df.drop(columns=['addr_lat', 'addr_lon'], index=0, inplace=True)
             dates = sorted(df.date_start.unique())
 
             for date_num, route in enumerate(inds):
@@ -303,17 +311,80 @@ if st.button('Готово', key='coords'):
             )
 
 
+        def new_print(data, manager, routing, solution):
+            i = 0
+            indexes = []
+            print(f'Objective: {solution.ObjectiveValue()}')
+            time_dimension = routing.GetDimensionOrDie('Time')
+            total_time = 0
+            day_time = []
+            j = 1
+            plan_outputs = []
+            global edited_df
+            for vehicle_id in range(data['num_vehicles']):
+                index = routing.Start(vehicle_id)
+                l = 0
+                plan_output = f"Номер бригады: {vehicle_id // int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + 1}\n"
+                plan_output += f"Номер рабочего дня: {vehicle_id % int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + 1}\n"
+                indexes.append([])
+                while not routing.IsEnd(index):
+                    l += 1
+                    time_var = time_dimension.CumulVar(index)
+                    plan_output += '{0} Время({1},{2}) -> '.format(
+                        edited_df.iloc[manager.IndexToNode(index)]['address'], solution.Min(time_var),
+                        solution.Max(time_var))
+                    index = solution.Value(routing.NextVar(index))
+                    indexes[i].append(manager.IndexToNode(index))
+                time_var = time_dimension.CumulVar(index)
+                plan_output += '{0} Время({1},{2})\n'.format(edited_df.iloc[manager.IndexToNode(index)]['address'],
+                                                            solution.Min(time_var),
+                                                            solution.Max(time_var))
+                plan_output += 'Время маршрута: {}min\n'.format(
+                    solution.Min(time_var))
+                plan_output += f"Количество задач: {l - 1}"
+                if solution.Min(time_var) > 0:
+                    st.text(plan_output)
+                day_time.append(solution.Min(time_var))
+                # times.append(solution.Min(time_var))
+                i += 1
+                plan_outputs.append((plan_output, solution.Min(time_var)))
+                # x.append(i)
+                if solution.Min(time_var) > 0:
+                    j += 1
+                #     st.text(plan_output)
+                total_time += solution.Min(time_var)
+                if (vehicle_id // int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))) > 0 and (vehicle_id % int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))) == 0 and total_time > 0:
+                    st.text(f"Общее время: {total_time}")
+                    total_time = 0
+
+
+        def fixing_task(manager, routing, work_id, date):
+            index = manager.NodeToIndex(work_id)
+            brigades_ids = [-1]
+            print(f'id {work_id}')
+            for j in range(brigades_num):
+                print(f"num days {int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))}")
+                print(f"num days 2 {int(working_days(edited_df.loc[0, 'date_start'], date))}")
+                print(f"daybrigade {j * int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + int(working_days(edited_df.loc[0, 'date_start'], date))}")
+                brigades_ids.append(j * int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + int(working_days(edited_df.loc[0, 'date_start'], date)))
+            routing.VehicleVar(index).SetValues(brigades_ids)
+
+
         def main():
             """Solve the VRP with time windows."""
             # Instantiate the data problem.
             data = create_data_model()
-
+            print(data)
             # Create the routing index manager.
             manager = pywrapcp.RoutingIndexManager(len(data['time_matrix']),
-                                                   data['num_vehicles'], data['depot'])
+                                                   int(num_vehicles), data['depot'])
 
             # Create Routing Model.
             routing = pywrapcp.RoutingModel(manager)
+            reset_df = edited_df.reset_index(drop=True)
+            frozen_tasks = reset_df[reset_df['work_type'] == "OTS"]
+            for i, row in frozen_tasks.iterrows():
+                fixing_task(manager, routing, i, row['date_start'])
 
             # Create and register a transit callback.
             def time_callback(from_index, to_index):
@@ -324,10 +395,15 @@ if st.button('Готово', key='coords'):
                 return data['time_matrix'][from_node][to_node]
 
             transit_callback_index = routing.RegisterTransitCallback(time_callback)
-
+            for vehicle_id in range(num_vehicles):
+                routing.SetFixedCostOfVehicle(
+                    1000 * vehicle_id**3 // int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + vehicle_id, vehicle_id)
             # Define cost of each arc.
             routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
-
+            # index = manager.NodeToIndex(1)
+            # routing.VehicleVar(index).SetValues([-1, 0])
+            # index = manager.NodeToIndex(22)
+            # routing.VehicleVar(index).SetValues([-1, 0])
             # Add Time Windows constraint.
             time = 'Time'
             routing.AddDimension(
@@ -360,9 +436,11 @@ if st.button('Готово', key='coords'):
             solution = routing.SolveWithParameters(search_parameters)
             # Print solution on console.
             if solution:
-                print_solution(data, manager, routing, solution)
+                new_print(data, manager, routing, solution)
             else:
                 print('no solution')
-        #     можно переписать на комбинацию всех методов и выбор лучшего
+        # #     можно переписать на комбинацию всех методов и выбор лучшего
+        #     for i, row in frozen_tasks.iterrows():
+        #         fixing_task(manager, routing, i, row['date_start'])
 
         main()

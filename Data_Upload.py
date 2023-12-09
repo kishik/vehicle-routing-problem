@@ -6,6 +6,7 @@ from geopy import Photon
 from datetime import datetime, date
 import requests
 from geopy import Yandex
+import numpy as np
 from streamlit_extras.switch_page_button import switch_page
 from streamlit_extras.app_logo import add_logo
 # from st_pages import Page, show_pages, add_page_title
@@ -62,16 +63,14 @@ def get_coordinates_row(row):
     r = requests.get('https://geocode-maps.yandex.ru/1.x',
                      params={'geocode': row, 'apikey': '2486ab02-2c39-4e68-8d2a-50c7deec2a70', 'format': 'json',
                              'bbox': '35.497,56.999~40.32,54.188'})
-    lon, lat = list(map(float,
-                        r.json()['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['Point'][
-                            'pos'].split()))
+    lon, lat = list(map(float, r.json()['response']['GeoObjectCollection']['featureMember'][0]['GeoObject']['Point']['pos'].split()))
     return lat, lon
 
 
 def get_file():
     return pd.read_csv(uploaded_file,
                        dtype={17: str, 18: str, 19: str, 21: str, 22: str, 24: str, 26: str, 14: str, 15: str,
-                              29: str, 31: str, 32: str, 33: str}, parse_dates=True, encoding='cp1251')
+                              29: str, 31: str, 32: str, 33: str, 15:float, 16:float}, parse_dates=True, encoding='utf8')
 
 
 st.session_state['mother_base'] = st.text_input('Введите адрес')
@@ -83,45 +82,47 @@ if uploaded_file is not None:
         'Выберите департамент',
         sorted(data_csv.loc[:, 'department'].unique().tolist()))
     if department is not None:
-        brigade = st.selectbox(
-            'Выберите бригаду',
-            sorted(data_csv.loc[data_csv['department'] == department]['brigada'].unique().tolist()))
-        if brigade is not None:
-            with st.spinner('Wait for it...'):
-                data_csv.loc[:, 'date_start'] = pd.to_datetime(data_csv.loc[:, 'date_start'], format='%Y-%m-%d')
-                data_csv.loc[:, 'date_end'] = pd.to_datetime(data_csv.loc[:, 'date_end'], format='%Y-%m-%d')
-                data_csv.loc[:, 'time_norm'] = data_csv.loc[:, 'time_norm'].astype(float) / 6
-                # FIXME выдает ошибку если мало дат и много работ в изначальном решении
+        with st.spinner('Wait for it...'):
+            data_csv.loc[:, 'date_start'] = pd.to_datetime(data_csv.loc[:, 'date_start'], format='%Y-%m-%d')
+            data_csv.loc[:, 'date_end'] = pd.to_datetime(data_csv.loc[:, 'date_end'], format='%Y-%m-%d')
+            data_csv.loc[:, 'time_norm'] = data_csv.loc[:, 'time_norm'].astype(float) / 6
+            # FIXME выдает ошибку если мало дат и много работ в изначальном решении
 
-                st.session_state['uploaded_data'] = data_csv
-                data_start = st.date_input(
-                    "Начальная дата",
-                    date(2023, 5, 1))
-                data_finish = st.date_input(
-                    "Конечная дата",
-                    date(2023, 5, 31))
+            st.session_state['uploaded_data'] = data_csv
+            data_start = st.date_input(
+                "Начальная дата",
+                date(2023, 5, 1))
+            data_finish = st.date_input(
+                "Конечная дата",
+                date(2023, 5, 31))
 
-                geolocator = Nominatim(user_agent="diploma")
-                geocode = partial(geolocator.geocode, language="ru", country_codes="RU")
-                filtered_data = data_csv[(data_csv['date_start'] >= pd.Timestamp(data_start)) & (
-                        data_csv['date_end'] <= pd.Timestamp(data_finish)) & (
-                                                 data_csv['department'] == department) & (
-                                                 data_csv['brigada'] == brigade)]
-                data_csv = filtered_data
-                edited_df = st.data_editor(data_csv, num_rows="dynamic", hide_index=True)
-
-                if st.button('Готово', key='data'):
-                    addr = pd.DataFrame({
-                        'date_start': pd.Timestamp(data_start),
-                        'date_end': pd.Timestamp(data_finish),
-                        'department': department,
-                        'brigada': brigade,
-                        'address': st.session_state['mother_base'],
-                        'time_norm': 0
-                    }, index=[0])
-                    edited_df = pd.concat([addr, edited_df[:]])
-                    edited_df[['lat', 'lon']] = edited_df.apply(lambda row: get_coordinates_row(row['address']),
-                                                                axis='columns',
-                                                                result_type='expand')
-                    st.session_state['key'] = edited_df
-                    switch_page("result")
+            geolocator = Nominatim(user_agent="diploma")
+            geocode = partial(geolocator.geocode, language="ru", country_codes="RU")
+            filtered_data = data_csv[(data_csv['date_start'] >= pd.Timestamp(data_start)) & (
+                    data_csv['date_end'] <= pd.Timestamp(data_finish)) & (
+                                                data_csv['department'] == department)]
+            data_csv = filtered_data
+            edited_df = st.data_editor(data_csv, num_rows="dynamic", hide_index=True)
+            edited_df = edited_df.loc[(edited_df.addr_lat > 54.111) & (edited_df.addr_lat < 57.083) & (edited_df.addr_lon > 34.958) & (edited_df.addr_lon < 40.463)]
+            if st.button('Готово', key='data'):
+                edited_df['addr_lat'].replace('', np.nan, inplace=True)
+                edited_df['addr_lon'].replace('', np.nan, inplace=True)
+                edited_df= edited_df.dropna(subset=['addr_lat'])
+                edited_df= edited_df.dropna(subset=['addr_lon'])
+                addr = pd.DataFrame({
+                    'date_start': pd.Timestamp(data_start),
+                    'date_end': pd.Timestamp(data_finish),
+                    'department': department,
+                    'address': st.session_state['mother_base'],
+                    'time_norm': 0
+                }, index=[0])
+                edited_df = pd.concat([addr, edited_df[:]])
+                edited_df.loc[0, 'addr_lat'], edited_df.loc[0, 'addr_lon'] = get_coordinates_row(st.session_state['mother_base'])
+                # edited_df.apply(lambda row: get_coordinates_row(row['address']),
+                #                                             axis='columns',
+                #                                             result_type='expand')
+                # edited_df[['lat', 'lon']] = edited_df.apply(lambda row: get_coordinates_row(row['address']),
+                #                                             axis='columns',
+                #                                             result_type='expand')
+                st.session_state['key'] = edited_df
+                switch_page("result")
