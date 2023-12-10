@@ -78,9 +78,11 @@ def export_to_csv():
 
 def working_days(start_date, finish_date):
     # numpy.busdaycalendar.holidays добавлять праздники
-    print(np.datetime64(finish_date))
-    print(np.datetime64(finish_date) + np.timedelta64(1,'D'))
-    return np.busday_count(np.datetime64(start_date), np.datetime64(finish_date) + np.timedelta64(1,'D'))
+    print('start date')
+    print(start_date)
+    print(f'start_date {start_date} {np.datetime64(start_date)}')
+    print(finish_date)
+    return np.busday_count(np.datetime64(pd.to_datetime((start_date))).astype('datetime64[D]'), np.datetime64(pd.to_datetime(finish_date)).astype('datetime64[D]') + np.timedelta64(1,'D'))
 
 
 def calculate_time_list(places: list[int], i: int):
@@ -100,14 +102,15 @@ if st.button('Готово', key='coords'):
         edited_df['time_norm'] = edited_df['time_norm'].astype(float)
         classic_work = edited_df.iloc[1:].groupby('date_start')['time_norm'].sum()
         days = edited_df.iloc[1:].groupby('date_start').groups.keys()
-        print(classic_work)
+        # print(classic_work)
         classic_work = classic_work.tolist()
         classic_work = [work * 60 for work in classic_work]
-        print(classic_work)
+        # print(classic_work)
         brigades_num = len(edited_df['brigada'].unique())
         print(f'brigades num {brigades_num}')
         df1 = {'Время работы в минутах': classic_work, 'Дни': days}
         st.bar_chart(df1, x='Дни', y='Время работы в минутах')
+        edited_df.reset_index(inplace=True)
         st.text('Количество рабочих дней: ' + str(int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))))
         if 'map' not in st.session_state:
             st.session_state['map'] = ox.io.load_graphml('data/graph.graphml')
