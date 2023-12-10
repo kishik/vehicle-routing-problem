@@ -108,7 +108,7 @@ if st.button('Готово', key='coords'):
         print(f'brigades num {brigades_num}')
         df1 = {'Время работы в минутах': classic_work, 'Дни': days}
         st.bar_chart(df1, x='Дни', y='Время работы в минутах')
-        st.text('Количество рабочих дней: ' + str(len(days)))
+        st.text('Количество рабочих дней: ' + str(int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))))
         if 'map' not in st.session_state:
             st.session_state['map'] = ox.io.load_graphml('data/graph.graphml')
         G_travel_time = st.session_state['map']
@@ -321,6 +321,8 @@ if st.button('Готово', key='coords'):
             j = 1
             plan_outputs = []
             global edited_df
+            brigade_total_work = []
+            brigades_days_time = [[], []]
             for vehicle_id in range(data['num_vehicles']):
                 index = routing.Start(vehicle_id)
                 l = 0
@@ -342,6 +344,9 @@ if st.button('Готово', key='coords'):
                 plan_output += 'Время маршрута: {}min\n'.format(
                     solution.Min(time_var))
                 plan_output += f"Количество задач: {l - 1}"
+                brigades_days_time[0].append(
+                    pd.to_datetime(np.busday_offset(np.datetime64(edited_df.loc[0, 'date_start']), vehicle_id % int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + 1, roll='forward')))
+                brigades_days_time[1].append(solution.Min(time_var))
                 if solution.Min(time_var) > 0:
                     st.text(plan_output)
                 day_time.append(solution.Min(time_var))
@@ -353,9 +358,24 @@ if st.button('Готово', key='coords'):
                     j += 1
                 #     st.text(plan_output)
                 total_time += solution.Min(time_var)
-                if (vehicle_id % int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))) == (int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) - 1) and total_time > 0:
-                    st.text(f"Общее время: {total_time}")
-                    total_time = 0
+                if (vehicle_id % int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))) == (int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) - 1):
+                    brigade_total_work.append(total_time)
+                    
+                    if total_time > 0:
+                        st.text(f"Общее время: {total_time}")
+                        # print(brigades_days_time[:][0])
+                        # print(brigades_days_time[:][1])
+                        df1 = {'Рабочие дни': np.array(brigades_days_time[0]),
+                               'Общее время в минутах': np.array(brigades_days_time[1])}
+                        st.bar_chart(df1, x='Рабочие дни', y=('Общее время в минутах'))
+                        total_time = 0
+                        brigades_days_time = [[], []]
+            if brigades_days_time != [] and total_time > 0:
+                st.text(f"Общее время: {total_time}")
+                df1 = {'Рабочие дни': np.array(brigades_days_time[0]),
+                               'Общее время в минутах': np.array(brigades_days_time[1])}
+                st.bar_chart(df1, x='Рабочие дни', y=('Общее время в минутах'))
+
 
 
         def fixing_task(manager, routing, work_id, date):
@@ -397,7 +417,7 @@ if st.button('Готово', key='coords'):
             transit_callback_index = routing.RegisterTransitCallback(time_callback)
             for vehicle_id in range(num_vehicles):
                 routing.SetFixedCostOfVehicle(
-                    1000 * vehicle_id**3 // int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + vehicle_id, vehicle_id)
+                    1000 * vehicle_id**3 // int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + vehicle_id ** 2, vehicle_id)
             # Define cost of each arc.
             routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
             # index = manager.NodeToIndex(1)
