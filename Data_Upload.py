@@ -78,7 +78,7 @@ def get_brigades():
                        parse_dates=True, encoding='utf8')
 
 
-st.session_state['mother_base'] = st.text_input('Введите адрес')
+# st.session_state['mother_base'] = st.text_input('Введите адрес')
 brigades = st.file_uploader("Choose a file brigades", key ='brigades')
 uploaded_file = st.file_uploader("Choose a file")
 if uploaded_file is not None and brigades is not None:
