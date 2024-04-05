@@ -93,6 +93,7 @@ def calculate_time_list(places: list[int], i: int):
 
 edited_df = st.session_state['key']
 edited_df = st.data_editor(edited_df, num_rows="dynamic", hide_index=True)
+st.write(len(st.session_state['all_brigades']))
 if st.button('Готово', key='coords'):
     edited_df['date_start'] = pd.to_datetime(edited_df['date_start']).dt.date
     edited_df['date_end'] = pd.to_datetime(edited_df['date_end']).dt.date
@@ -106,7 +107,8 @@ if st.button('Готово', key='coords'):
         classic_work = classic_work.tolist()
         classic_work = [work * 60 for work in classic_work]
         # print(classic_work)
-        brigades_num = len(edited_df['brigada'].unique())
+        # brigades_num = len(edited_df['brigada'].unique())
+        brigades_num = len(st.session_state['all_brigades'])
         print(f'brigades num {brigades_num}')
         df1 = {'Время работы в минутах': classic_work, 'Дни': days}
         st.bar_chart(df1, x='Дни', y='Время работы в минутах')
@@ -145,7 +147,7 @@ if st.button('Готово', key='coords'):
 
         count_df = edited_df.groupby(['date_start']).size().values.tolist()
         coords = edited_df.values.tolist()
-        coords_i = [(i, coords[i][-2], coords[i][-1]) for i in range(len(coords))]
+        coords_i = [(i, coords[i][18], coords[i][19]) for i in range(len(coords))]
         # i : node number
 
         # remove ununique node numbers
@@ -181,17 +183,26 @@ if st.button('Готово', key='coords'):
                 minute_matrix[i][j] += service_time[j]
             minute_matrix[i][i] = 0
 
-        print(f"days {working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])}")
+        days_for_brigade = working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])
+        print(f"days {days_for_brigade}")
         
-        num_vehicles = brigades_num * working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])
+        num_vehicles = brigades_num * days_for_brigade
         print(f"num {num_vehicles}")
+
+
+        def flatten(a):
+            return [c for b in a for c in flatten(b)] if hasattr(a, '__iter__') else [a]
+
 
         def create_data_model():
             """Stores the data for the problem."""
             data = {}
             data['time_matrix'] = minute_matrix
             data['num_vehicles'] = int(num_vehicles)
-            data['depot'] = 0
+            # data['depot'] = 0
+
+            data["starts"] = flatten([[i] * days_for_brigade for i in range(int(brigades_num))])
+            data["ends"] = data["starts"].copy()
             # data['time_windows'] = [
             #     (0, 480) for i in range(len(minute_matrix))  # 16
             # ]
@@ -400,7 +411,7 @@ if st.button('Готово', key='coords'):
             print(data)
             # Create the routing index manager.
             manager = pywrapcp.RoutingIndexManager(len(data['time_matrix']),
-                                                   int(num_vehicles), data['depot'])
+                                                   int(num_vehicles), data["starts"], data["ends"])
 
             # Create Routing Model.
             routing = pywrapcp.RoutingModel(manager)
@@ -431,9 +442,9 @@ if st.button('Готово', key='coords'):
             time = 'Time'
             routing.AddDimension(
                 transit_callback_index,
-                30,  # allow waiting time
+                0,  # allow waiting time
                 480,  # maximum time per vehicle
-                False,  # Don't force start cumul to zero.
+                True,  # force start cumul to zero.
                 time)
             time_dimension = routing.GetDimensionOrDie(time)
 

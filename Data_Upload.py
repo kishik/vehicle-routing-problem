@@ -73,11 +73,17 @@ def get_file():
                               29: str, 31: str, 32: str, 33: str, 15:float, 16:float}, parse_dates=True, encoding='utf8')
 
 
-st.session_state['mother_base'] = st.text_input('Введите адрес')
+def get_brigades():
+    return pd.read_csv(brigades,
+                       parse_dates=True, encoding='utf8')
 
+
+st.session_state['mother_base'] = st.text_input('Введите адрес')
+brigades = st.file_uploader("Choose a file brigades", key ='brigades')
 uploaded_file = st.file_uploader("Choose a file")
-if uploaded_file is not None:
+if uploaded_file is not None and brigades is not None:
     data_csv = get_file()
+    brigades = get_brigades()
     department = st.selectbox(
         'Выберите департамент',
         sorted(data_csv.loc[:, 'department'].unique().tolist()))
@@ -91,10 +97,10 @@ if uploaded_file is not None:
             st.session_state['uploaded_data'] = data_csv
             data_start = st.date_input(
                 "Начальная дата",
-                date(2023, 5, 1))
+                date(2023, 10, 1))
             data_finish = st.date_input(
                 "Конечная дата",
-                date(2023, 5, 31))
+                date(2023, 10, 31))
 
             geolocator = Nominatim(user_agent="diploma")
             geocode = partial(geolocator.geocode, language="ru", country_codes="RU")
@@ -103,21 +109,27 @@ if uploaded_file is not None:
                                                 data_csv['department'] == department)]
             data_csv = filtered_data
             edited_df = st.data_editor(data_csv, num_rows="dynamic", hide_index=True)
+            brr = st.data_editor(brigades.loc[brigades['brigada'].str.startswith(department, na=False)], num_rows="dynamic", hide_index=True, key='gfgdf')
             edited_df = edited_df.loc[(edited_df.addr_lat > 54.111) & (edited_df.addr_lat < 57.083) & (edited_df.addr_lon > 34.958) & (edited_df.addr_lon < 40.463)]
             if st.button('Готово', key='data'):
                 edited_df['addr_lat'].replace('', np.nan, inplace=True)
                 edited_df['addr_lon'].replace('', np.nan, inplace=True)
                 edited_df= edited_df.dropna(subset=['addr_lat'])
                 edited_df= edited_df.dropna(subset=['addr_lon'])
-                addr = pd.DataFrame({
-                    'date_start': pd.Timestamp(data_start),
-                    'date_end': pd.Timestamp(data_finish),
-                    'department': department,
-                    'address': st.session_state['mother_base'],
-                    'time_norm': 0
-                }, index=[0])
-                edited_df = pd.concat([addr, edited_df[:]])
-                edited_df.loc[0, 'addr_lat'], edited_df.loc[0, 'addr_lon'] = get_coordinates_row(st.session_state['mother_base'])
+                st.session_state['all_brigades'] = []
+                for index, row in brr.iterrows():
+                    st.write(row['address'])
+                    addr = pd.DataFrame({
+                        'date_start': pd.Timestamp(data_start),
+                        'date_end': pd.Timestamp(data_finish),
+                        'department': department,
+                        # 'address': st.session_state['mother_base'],
+                        'address': row['address'],
+                        'time_norm': 0
+                    }, index=[0])
+                    st.session_state['all_brigades'].append(row['brigada'])
+                    edited_df = pd.concat([addr, edited_df[:]])
+                    edited_df.loc[0, 'addr_lat'], edited_df.loc[0, 'addr_lon'] = get_coordinates_row(row['address'])
                 # edited_df.apply(lambda row: get_coordinates_row(row['address']),
                 #                                             axis='columns',
                 #                                             result_type='expand')
@@ -125,4 +137,5 @@ if uploaded_file is not None:
                 #                                             axis='columns',
                 #                                             result_type='expand')
                 st.session_state['key'] = edited_df
+                # st.write(len(st.session_state['all_brigades']))
                 switch_page("result")
