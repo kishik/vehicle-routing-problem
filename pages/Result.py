@@ -78,10 +78,10 @@ def export_to_csv():
 
 def working_days(start_date, finish_date):
     # numpy.busdaycalendar.holidays добавлять праздники
-    print('start date')
-    print(start_date)
-    print(f'start_date {start_date} {np.datetime64(start_date)}')
-    print(finish_date)
+    # print('start date')
+    # print(start_date)
+    # print(f'start_date {start_date} {np.datetime64(start_date)}')
+    # print(finish_date)
     return np.busday_count(np.datetime64(pd.to_datetime((start_date))).astype('datetime64[D]'), np.datetime64(pd.to_datetime(finish_date)).astype('datetime64[D]') + np.timedelta64(1,'D'))
 
 
@@ -168,8 +168,8 @@ if st.button('Готово', key='coords'):
         time_matrix = [[result[dicts_number[works_num[i]]][works_num[j]]
                         for j in range(len(coords_i))] for i in range(len(coords_i))]
 
-        custom_notification_box(icon='info', textDisplay='Закончили с матрицей смежности',
-                                externalLink='', url='#', styles=styles, key="matrix_end")
+        # custom_notification_box(icon='info', textDisplay='Закончили с матрицей смежности',
+        #                         externalLink='', url='#', styles=styles, key="matrix_end")
 
         minute_matrix = [[math.ceil(time_matrix[i][j] / 60) for j in range(len(time_matrix[0]))] for i in
                          range(len(time_matrix))]
@@ -431,7 +431,8 @@ if st.button('Готово', key='coords'):
             transit_callback_index = routing.RegisterTransitCallback(time_callback)
             for vehicle_id in range(num_vehicles):
                 routing.SetFixedCostOfVehicle(
-                    1000 * vehicle_id**3 // int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + vehicle_id ** 2, vehicle_id)
+                    vehicle_id * 10000, vehicle_id)
+                    # 1000 * vehicle_id**3 // int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + vehicle_id ** 2, vehicle_id)
             # Define cost of each arc.
             routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
             # index = manager.NodeToIndex(1)
