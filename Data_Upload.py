@@ -77,7 +77,8 @@ def get_brigades():
     return pd.read_csv(brigades,
                        parse_dates=True, encoding='utf8')
 
-
+if 'cached' not in st.session_state:
+    st.session_state['cached'] = {}
 # st.session_state['mother_base'] = st.text_input('Введите адрес')
 brigades = st.file_uploader("Choose a file brigades", key ='brigades')
 uploaded_file = st.file_uploader("Choose a file")

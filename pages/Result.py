@@ -87,8 +87,10 @@ def working_days(start_date, finish_date):
 
 def calculate_time_list(places: list[int], i: int):
     lenghts = nx.single_source_dijkstra_path_length(G_travel_time, places[i], cutoff=28800, weight='travel_time')
-    matrix = {place: lenghts[place] for place in places}
-    return matrix
+    res = {places[i]: lenghts}
+    res[places[i]][places[i]] = 0
+    return res
+
 
 
 edited_df = st.session_state['key']
@@ -160,7 +162,16 @@ if st.button('Готово', key='coords'):
                                 url='https://networkx.org/documentation/stable/reference/algorithms/generated'
                                     '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
                                 styles=styles, key="matrix_start")
-        result = Parallel(n_jobs=-1)(delayed(calculate_time_list)(works_unique, i) for i in range(len(works_unique)))
+        visited_points = st.session_state['cached']
+        points_to_check = list(set(works_num.values()) - set(visited_points))
+        lenghts = Parallel(n_jobs=-1)(delayed(calculate_time_list)(points_to_check, i) for i in range(len(points_to_check)))
+        # print(lenghts)
+        for i in range(len(points_to_check)):
+            visited_points[points_to_check[i]] = lenghts[i]
+        print(visited_points[list(visited_points.keys())[0]])
+        print(visited_points.keys())
+        result = [{place: visited_points[source][source][place] for place in works_unique} for source in works_unique]
+
         # i [distance to [0] [1]] node number
         # time_matrix = [[works_unique[j] for j in range(len(coords_i))]]
         # [i [distance to 0 1]] node number
