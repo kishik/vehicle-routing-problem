@@ -163,7 +163,7 @@ if st.button('Готово', key='coords'):
                                     '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
                                 styles=styles, key="matrix_start")
         visited_points = st.session_state['cached']
-        points_to_check = list(set(works_num.values()) - set(visited_points))
+        points_to_check = list(set(works_num.values()) - set(visited_points.keys()))
         lenghts = Parallel(n_jobs=-1)(delayed(calculate_time_list)(points_to_check, i) for i in range(len(points_to_check)))
         # print(lenghts)
         for i in range(len(points_to_check)):
