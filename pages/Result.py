@@ -16,6 +16,62 @@ from joblib import Parallel, delayed
 from streamlit_custom_notification_box import custom_notification_box
 from streamlit_extras.app_logo import add_logo
 from st_pages import Page, show_pages, add_page_title
+import os.path
+import sqlite3
+
+
+
+class Saver:
+
+
+    @staticmethod
+    def read_distnces_from_point_exist(point, points):
+        con = sqlite3.connect("test.db")
+        cursor = con.cursor()
+        cursor.execute(f"SELECT target_point, distance FROM distances WHERE source_point={point}")
+        data = cursor.fetchall()
+        data = Saver.convert(data)
+        result = []
+        error = False
+        print(data)
+        for key in points:
+            if key not in points:
+                result = None
+                error = True
+            else:
+                result.append(data[key])
+        return error, result
+
+
+    @staticmethod
+    def save_distnces_from_point_exist(point, points, distances):
+        con = sqlite3.connect("test.db")
+        cursor = con.cursor()
+        query = '''INSERT INTO distances(source_point, target_point, distance) VALUES'''
+        for i in range(len(distances)):
+            query += f'''
+            ({point}, {points[i]}, {distances[i]}),
+            ({points[i]}, {point}, {distances[i]}),'''
+        query = query[:-1] + ';'
+        cursor.execute(query)
+        con.commit()
+
+
+    @staticmethod
+    def load_ids(names):
+        con = sqlite3.connect("test.db")
+        cursor = con.cursor()
+        result = []
+        for name in names:
+            cursor.execute(f"SELECT Id FROM addr WHERE Name='{name}'")
+            data = cursor.fetchall()
+            result.append(data[0][0])
+        return result
+
+
+    @staticmethod
+    def convert(tup):
+        return dict(tup)
 
 # add_page_title()
 
@@ -26,6 +82,58 @@ from st_pages import Page, show_pages, add_page_title
 # st.set_page_config(
 #         page_title="Результат2222",
 # )
+
+
+class Keeper:
+
+    def load_file(self, source):
+        self.data = pd.read_csv(source)
+        return self.data
+    
+
+    def save_file(self, target):
+        self.data.to_csv(target)
+    
+
+    def extract_subset(self, values):
+        return self.data.loc[values, [f'{value}' for value in values]]
+    
+
+    def is_enough_data(self, values):
+        return not self.extract_subset(values).isnull().values.any()
+    
+
+    def add_data(self, new_data):
+        new_cols = set(new_data.columns) - set(self.data.columns)
+        old_cols = set(new_data.columns).intersection(set(self.data.columns))
+        no_cols = new_cols | old_cols
+        # no_cols.remove('index')
+        # self.data.loc[[int(new_col) for new_col in no_cols], [f'{new_col}' for new_col in no_cols]] = new_data.loc[[int(new_col) for new_col in no_cols], [f'{new_col}' for new_col in no_cols]]
+        # for new_col in new_cols:
+        #     self.data.loc[int(new_col), f'{new_col}'] = 0
+            # fill data
+        # for index, row in new_data.iterrows():
+        #     if index in self.data.index:
+        #         for new_col in new_cols:
+        #             self.data.loc[int(index), f'{new_col}'] = new_data.loc[int(index), f'{new_col}']
+        return self.data
+                
+
+
+    
+    @staticmethod
+    def numpy_to_pandas(matrix, indexes):
+        panda = pd.DataFrame(matrix, columns=indexes)
+        idxs = [f'{index}' for index in indexes]
+        panda['index'] = idxs
+        panda.set_index('index', inplace=True)
+        return panda
+
+
+    def pandas_to_numpy(self):
+        return self.data.to_numpy(), self.data.index
+
+
 
 styles = {'material-icons': {'color': 'blue'},
           'text-icon-link-close-container': {'box-shadow': '#3896de 0px 4px'},
@@ -157,20 +265,31 @@ if st.button('Готово', key='coords'):
         dicts_number = {works_unique[i]: i for i in range(len(works_unique))}
         st.text(str(coords_i))
         st.text(len(edited_df))
+
+        loaded = []
+        loaded_flag = []
+        for work in works_unique:
+            line = Saver.read_distnces_from_point_exist(work, works_unique)
+            loaded.append(line[1])
+            loaded_flag.append(line[0])
+        
+     
         custom_notification_box(icon='info', textDisplay='Приступаем к матрице смежности',
-                                externalLink='shortest_path_length',
-                                url='https://networkx.org/documentation/stable/reference/algorithms/generated'
-                                    '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
-                                styles=styles, key="matrix_start")
-        visited_points = st.session_state['cached']
-        points_to_check = list(set(works_num.values()) - set(visited_points.keys()))
+                            externalLink='shortest_path_length',
+                            url='https://networkx.org/documentation/stable/reference/algorithms/generated'
+                                '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
+                            styles=styles, key="matrix_start")
+        # visited_points = st.session_state['cached']
+        visited_points = []
+        # points_to_check = list(set(works_num.values()) - set(visited_points.keys()))
+        points_to_check = list(set([works_unique[i] for i in range(len(works_unique))]))
         lenghts = Parallel(n_jobs=-1)(delayed(calculate_time_list)(points_to_check, i) for i in range(len(points_to_check)))
-        # print(lenghts)
+        print(lenghts)
         for i in range(len(points_to_check)):
             visited_points[points_to_check[i]] = lenghts[i]
-        print(visited_points[list(visited_points.keys())[0]])
-        print(visited_points.keys())
-        result = [{place: visited_points[source][source][place] for place in works_unique} for source in works_unique]
+        # print(visited_points[list(visited_points.keys())[0]])
+        # print(visited_points.keys())
+        result = [{place: visited_points[source][source].get(place, 9999999) for place in works_unique} for source in works_unique]
 
         # i [distance to [0] [1]] node number
         # time_matrix = [[works_unique[j] for j in range(len(coords_i))]]
@@ -183,8 +302,19 @@ if st.button('Готово', key='coords'):
         #                         externalLink='', url='#', styles=styles, key="matrix_end")
 
         minute_matrix = [[math.ceil(time_matrix[i][j] / 60) for j in range(len(time_matrix[0]))] for i in
-                         range(len(time_matrix))]
-
+                            range(len(time_matrix))]
+            # test.data = test.numpy_to_pandas(minute_matrix, list(range(len(minute_matrix))))
+        
+        # else:
+        #     custom_notification_box(icon='info', textDisplay='Загружаем из файла',
+        #                         externalLink='', url='',
+        #                         styles=styles, key="matrix_load")
+        #     print('WOW')
+        #     test.load_file('test.csv')
+        #     minute_matrix = test.pandas_to_numpy()[0]
+        # print(list(range(len(minute_matrix))))
+        # print(test.data)
+        # test.save_file('test.csv')
         service_time = edited_df['time_norm'].astype(float).tolist()
         service_time = [math.ceil(service_time[i] * 60) for i in range(len(service_time))]
         service_time[0] = 0
@@ -339,7 +469,7 @@ if st.button('Готово', key='coords'):
         def new_print(data, manager, routing, solution):
             i = 0
             indexes = []
-            print(f'Objective: {solution.ObjectiveValue()}')
+            # print(f'Objective: {solution.ObjectiveValue()}')
             time_dimension = routing.GetDimensionOrDie('Time')
             total_time = 0
             day_time = []
@@ -408,9 +538,9 @@ if st.button('Готово', key='coords'):
             brigades_ids = [-1]
             print(f'id {work_id}')
             for j in range(brigades_num):
-                print(f"num days {int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))}")
-                print(f"num days 2 {int(working_days(edited_df.loc[0, 'date_start'], date))}")
-                print(f"daybrigade {j * int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + int(working_days(edited_df.loc[0, 'date_start'], date))}")
+                # print(f"num days {int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))}")
+                # print(f"num days 2 {int(working_days(edited_df.loc[0, 'date_start'], date))}")
+                # print(f"daybrigade {j * int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + int(working_days(edited_df.loc[0, 'date_start'], date))}")
                 brigades_ids.append(j * int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + int(working_days(edited_df.loc[0, 'date_start'], date)))
             routing.VehicleVar(index).SetValues(brigades_ids)
 
@@ -419,7 +549,7 @@ if st.button('Готово', key='coords'):
             """Solve the VRP with time windows."""
             # Instantiate the data problem.
             data = create_data_model()
-            print(data)
+            # print(data)
             # Create the routing index manager.
             manager = pywrapcp.RoutingIndexManager(len(data['time_matrix']),
                                                    int(num_vehicles), data["starts"], data["ends"])
@@ -474,7 +604,7 @@ if st.button('Готово', key='coords'):
             # search_parameters.time_limit.seconds = 30
             search_parameters.use_full_propagation = False
             search_parameters.time_limit.seconds = 60
-            search_parameters.log_search = True
+            search_parameters.log_search = False
             search_parameters.use_full_propagation = True
             search_parameters.local_search_metaheuristic = (
                 routing_enums_pb2.LocalSearchMetaheuristic.SIMULATED_ANNEALING)

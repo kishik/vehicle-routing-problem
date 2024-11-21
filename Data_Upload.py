@@ -130,7 +130,7 @@ if uploaded_file is not None and brigades is not None:
                     }, index=[0])
                     st.session_state['all_brigades'].append(row['brigada'])
                     edited_df = pd.concat([addr, edited_df[:]])
-                    edited_df.loc[0, 'addr_lat'], edited_df.loc[0, 'addr_lon'] = get_coordinates_row(row['address'])
+                    edited_df.loc[0, 'addr_lat'], edited_df.loc[0, 'addr_lon'] = brr.iloc[0, 3], brr.iloc[0, 2]
                 # edited_df.apply(lambda row: get_coordinates_row(row['address']),
                 #                                             axis='columns',
                 #                                             result_type='expand')
