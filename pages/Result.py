@@ -28,7 +28,7 @@ class Saver:
     def read_distnces_from_point_exist(point, points):
         con = sqlite3.connect("test.db")
         cursor = con.cursor()
-        cursor.execute(f"SELECT target_point, distance FROM distances WHERE source_point={point}")
+        cursor.execute(f"SELECT target_point, distance FROM fsma_cross_time WHERE source_point={point}")
         data = cursor.fetchall()
         data = Saver.convert(data)
         result = []
@@ -44,14 +44,15 @@ class Saver:
 
 
     @staticmethod
-    def save_distnces_from_point_exist(point, points, distances):
+    def save_distnces_from_point_exist(point, points, distances, source_names, target_names, department):
         con = sqlite3.connect("test.db")
         cursor = con.cursor()
-        query = '''INSERT INTO distances(source_point, target_point, distance) VALUES'''
+        query = '''INSERT INTO fsma_cross_time(source_addr, dest_addr, department, travel_time, source_place_id, dest_place_id) VALUES'''
         for i in range(len(distances)):
-            query += f'''
-            ({point}, {points[i]}, {distances[i]}),
-            ({points[i]}, {point}, {distances[i]}),'''
+            for source_name in source_names:
+                for target_name in target_names:
+                    query += f'''
+                    ('{source_name}', '{target_name}', '{department}', {distances[i]}, {point}, {points[i]}  ),'''
         query = query[:-1] + ';'
         cursor.execute(query)
         con.commit()
@@ -232,10 +233,19 @@ if st.button('Готово', key='coords'):
         edited_df.reset_index(inplace=True)
         basic_len = len(edited_df)
         works_num = dict()
+        addr_to_id = {}
+        id_to_addr = {}
+
         for i, row in edited_df.iterrows():
-            print(i)
+            # print(i)
+            department = row['department']
             works_num[i] = ox.distance.nearest_nodes(
                 G_travel_time, row['addr_lon'], row['addr_lat'], return_dist=False)
+            addr_to_id[row['address']] = works_num[i]
+            if works_num[i] not in id_to_addr:
+                id_to_addr[works_num[i]] = [row['address']]
+            else:
+                id_to_addr[works_num[i]].append(row['address'])
             row['time_norm'] = float(row['time_norm'])
 
             time_norm = math.ceil(float(row['time_norm']) * 60)
@@ -268,10 +278,10 @@ if st.button('Готово', key='coords'):
 
         loaded = []
         loaded_flag = []
-        for work in works_unique:
-            line = Saver.read_distnces_from_point_exist(work, works_unique)
-            loaded.append(line[1])
-            loaded_flag.append(line[0])
+        # for work in works_unique:
+        #     line = Saver.read_distnces_from_point_exist(work, works_unique)
+        #     loaded.append(line[1])
+        #     loaded_flag.append(line[0])
         
      
         custom_notification_box(icon='info', textDisplay='Приступаем к матрице смежности',
@@ -280,17 +290,20 @@ if st.button('Готово', key='coords'):
                                 '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
                             styles=styles, key="matrix_start")
         # visited_points = st.session_state['cached']
-        visited_points = []
+        visited_points = {}
         # points_to_check = list(set(works_num.values()) - set(visited_points.keys()))
         points_to_check = list(set([works_unique[i] for i in range(len(works_unique))]))
         lenghts = Parallel(n_jobs=-1)(delayed(calculate_time_list)(points_to_check, i) for i in range(len(points_to_check)))
-        print(lenghts)
+        # print(lenghts)
         for i in range(len(points_to_check)):
             visited_points[points_to_check[i]] = lenghts[i]
+            
         # print(visited_points[list(visited_points.keys())[0]])
         # print(visited_points.keys())
         result = [{place: visited_points[source][source].get(place, 9999999) for place in works_unique} for source in works_unique]
-
+        for source in works_unique:
+            for target in works_unique:   
+                Saver.save_distnces_from_point_exist(source, [target], [visited_points[target][target].get(source, 9999999)], id_to_addr[source], id_to_addr[target], department)
         # i [distance to [0] [1]] node number
         # time_matrix = [[works_unique[j] for j in range(len(coords_i))]]
         # [i [distance to 0 1]] node number
@@ -304,6 +317,9 @@ if st.button('Готово', key='coords'):
         minute_matrix = [[math.ceil(time_matrix[i][j] / 60) for j in range(len(time_matrix[0]))] for i in
                             range(len(time_matrix))]
             # test.data = test.numpy_to_pandas(minute_matrix, list(range(len(minute_matrix))))
+        # for i in range(len(minute_matrix)):
+        #     print(works_unique[i], works_unique, minute_matrix[i])
+        #     Saver.save_distnces_from_point_exist(works_unique[i], works_unique, minute_matrix[i])
         
         # else:
         #     custom_notification_box(icon='info', textDisplay='Загружаем из файла',
