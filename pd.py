@@ -150,7 +150,11 @@ class Saver:
 
 
 
-print(Saver.load_ids(['г.Истра ул.Ленина', 'Клинский р-н, с-з "Высоковский"']))
+con = sqlite3.connect("test.db")
+cursor = con.cursor()
+cursor.execute(f"SELECT dest_place_id, travel_time FROM fsma_cross_time WHERE source_place_id={270831237};")
+data = cursor.fetchall()
+print(Saver.convert(data))
 
 
 # a = Keeper()

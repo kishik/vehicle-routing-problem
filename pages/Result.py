@@ -18,6 +18,7 @@ from streamlit_extras.app_logo import add_logo
 from st_pages import Page, show_pages, add_page_title
 import os.path
 import sqlite3
+import time
 
 
 
@@ -28,19 +29,9 @@ class Saver:
     def read_distnces_from_point_exist(point, points):
         con = sqlite3.connect("test.db")
         cursor = con.cursor()
-        cursor.execute(f"SELECT target_point, distance FROM fsma_cross_time WHERE source_point={point}")
+        cursor.execute(f"SELECT dest_place_id, travel_time FROM fsma_cross_time WHERE source_place_id={point} and dest_place_id IN ({', '.join(str(point) for point in points)});")
         data = cursor.fetchall()
-        data = Saver.convert(data)
-        result = []
-        error = False
-        print(data)
-        for key in points:
-            if key not in points:
-                result = None
-                error = True
-            else:
-                result.append(data[key])
-        return error, result
+        return Saver.convert(data)
 
 
     @staticmethod
@@ -282,27 +273,46 @@ if st.button('Готово', key='coords'):
         #     line = Saver.read_distnces_from_point_exist(work, works_unique)
         #     loaded.append(line[1])
         #     loaded_flag.append(line[0])
-        
-     
+        new_visited_points = {}
+        visited_points = {}
+        for work in works_unique:
+            recieved_ways = Saver.read_distnces_from_point_exist(work, works_unique)
+            if len(recieved_ways) == len(works_unique):
+                new_visited_points[work] = recieved_ways
+
         custom_notification_box(icon='info', textDisplay='Приступаем к матрице смежности',
                             externalLink='shortest_path_length',
                             url='https://networkx.org/documentation/stable/reference/algorithms/generated'
                                 '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
                             styles=styles, key="matrix_start")
-        # visited_points = st.session_state['cached']
-        visited_points = {}
+        # visited_points = st.session_state['cached']        
         # points_to_check = list(set(works_num.values()) - set(visited_points.keys()))
-        points_to_check = list(set([works_unique[i] for i in range(len(works_unique))]))
-        lenghts = Parallel(n_jobs=-1)(delayed(calculate_time_list)(points_to_check, i) for i in range(len(points_to_check)))
+        points_to_check = list(set(works_unique).difference(set(new_visited_points.keys())))
+        st.text(f'points_to_check: {len(points_to_check)}')
+        start_time = time.time()
+
+        lenghts = Parallel(n_jobs=-2)(delayed(calculate_time_list)(points_to_check, i) for i in range(len(points_to_check)))
+        st.text(f'time spent on graph: {time.time() - start_time}')
         # print(lenghts)
         for i in range(len(points_to_check)):
             visited_points[points_to_check[i]] = lenghts[i]
             
         # print(visited_points[list(visited_points.keys())[0]])
         # print(visited_points.keys())
-        result = [{place: visited_points[source][source].get(place, 9999999) for place in works_unique} for source in works_unique]
+        result = []
         for source in works_unique:
-            for target in works_unique:   
+            result.append({})
+            if source in points_to_check:
+                for place in points_to_check:
+                    result[-1][place] = visited_points[source][source].get(place, 9999999)
+            elif source in new_visited_points:
+                for place in new_visited_points.keys():
+                    result[-1][place] = new_visited_points[source].get(place, 9999999)
+
+        # result = [{place: visited_points[source][source].get(place, 9999999) for place in points_to_check} for source in points_to_check]
+        # loaded_result = [{place: new_visited_points for place in new_visited_points.keys()} for source in new_visited_points.keys()]
+        for source in visited_points:
+            for target in visited_points:   
                 Saver.save_distnces_from_point_exist(source, [target], [visited_points[target][target].get(source, 9999999)], id_to_addr[source], id_to_addr[target], department)
         # i [distance to [0] [1]] node number
         # time_matrix = [[works_unique[j] for j in range(len(coords_i))]]
@@ -634,5 +644,5 @@ if st.button('Готово', key='coords'):
         # #     можно переписать на комбинацию всех методов и выбор лучшего
         #     for i, row in frozen_tasks.iterrows():
         #         fixing_task(manager, routing, i, row['date_start'])
-
+        st.text(f'started solution')
         main()
