@@ -203,6 +203,7 @@ def calculate_time_list(places: list[int], i: int):
 edited_df = st.session_state['key']
 edited_df = st.data_editor(edited_df, num_rows="dynamic", hide_index=True)
 st.write(len(st.session_state['all_brigades']))
+solution_time = int(st.number_input("Введите время решения в секундах", value=60))
 if st.button('Готово', key='coords'):
     edited_df['date_start'] = pd.to_datetime(edited_df['date_start']).dt.date
     edited_df['date_end'] = pd.to_datetime(edited_df['date_end']).dt.date
@@ -639,7 +640,7 @@ if st.button('Готово', key='coords'):
                 routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
             # search_parameters.time_limit.seconds = 30
             search_parameters.use_full_propagation = False
-            search_parameters.time_limit.seconds = 60
+            search_parameters.time_limit.seconds = solution_time
             search_parameters.log_search = False
             search_parameters.use_full_propagation = True
             search_parameters.local_search_metaheuristic = (
