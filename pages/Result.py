@@ -30,8 +30,15 @@ class Saver:
         con = sqlite3.connect("test.db")
         cursor = con.cursor()
         cursor.execute(f"SELECT dest_place_id, travel_time FROM fsma_cross_time WHERE source_place_id={point} and dest_place_id IN ({', '.join(str(point) for point in points)});")
-        data = cursor.fetchall()
-        return Saver.convert(data)
+        return Saver.convert(cursor.fetchall())
+    
+
+    def addresses_to_ids(points):
+        con = sqlite3.connect("test.db")
+        cursor = con.cursor()
+        sub_str = ', '.join('\'' + str(point) + '\'' for point in points) + ');'
+        cursor.execute(f"SELECT source_addr, source_place_id FROM fsma_cross_time WHERE source_addr IN (" + sub_str)
+        return Saver.convert(cursor.fetchall())
 
 
     @staticmethod
@@ -226,12 +233,15 @@ if st.button('Готово', key='coords'):
         works_num = dict()
         addr_to_id = {}
         id_to_addr = {}
-
+        addresses_to_ids = Saver.addresses_to_ids(edited_df['address'].tolist())
         for i, row in edited_df.iterrows():
             # print(i)
             department = row['department']
-            works_num[i] = ox.distance.nearest_nodes(
-                G_travel_time, row['addr_lon'], row['addr_lat'], return_dist=False)
+            if row['address'] in addresses_to_ids:
+                works_num[i] = addresses_to_ids[row['address']]
+            else:
+                works_num[i] = ox.distance.nearest_nodes(
+                    G_travel_time, row['addr_lon'], row['addr_lat'], return_dist=False)
             addr_to_id[row['address']] = works_num[i]
             if works_num[i] not in id_to_addr:
                 id_to_addr[works_num[i]] = [row['address']]
