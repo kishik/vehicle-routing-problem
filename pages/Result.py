@@ -5,21 +5,72 @@ import osmnx as ox
 import sklearn
 import numpy as np
 import geopandas as gpd
-import taxicab as tc
-from geopy.geocoders import Nominatim
+# import taxicab as tc
 from functools import partial
-from geopy import Photon
 import networkx as nx
 from datetime import datetime, date, timedelta
 import requests
-from geopy import Yandex
 from matplotlib import pyplot as plt
 from ortools.constraint_solver import pywrapcp, routing_enums_pb2
 from joblib import Parallel, delayed
-from streamlit_extras.switch_page_button import switch_page
 from streamlit_custom_notification_box import custom_notification_box
 from streamlit_extras.app_logo import add_logo
 from st_pages import Page, show_pages, add_page_title
+import os.path
+import sqlite3
+import time
+
+
+
+class Saver:
+
+
+    @staticmethod
+    def read_distnces_from_point_exist(point, points):
+        con = sqlite3.connect("test.db")
+        cursor = con.cursor()
+        cursor.execute(f"SELECT dest_place_id, travel_time FROM fsma_cross_time WHERE source_place_id={point} and dest_place_id IN ({', '.join(str(point) for point in points)});")
+        return Saver.convert(cursor.fetchall())
+    
+
+    def addresses_to_ids(points):
+        con = sqlite3.connect("test.db")
+        cursor = con.cursor()
+        sub_str = ', '.join('\'' + str(point) + '\'' for point in points) + ');'
+        cursor.execute(f"SELECT source_addr, source_place_id FROM fsma_cross_time WHERE source_addr IN (" + sub_str)
+        return Saver.convert(cursor.fetchall())
+
+
+    @staticmethod
+    def save_distnces_from_point_exist(point, points, distances, source_names, target_names, department):
+        con = sqlite3.connect("test.db")
+        cursor = con.cursor()
+        query = '''INSERT INTO fsma_cross_time(source_addr, dest_addr, department, travel_time, source_place_id, dest_place_id) VALUES'''
+        for i in range(len(distances)):
+            for source_name in source_names:
+                for target_name in target_names:
+                    query += f'''
+                    ('{source_name}', '{target_name}', '{department}', {distances[i]}, {point}, {points[i]}  ),'''
+        query = query[:-1] + ';'
+        cursor.execute(query)
+        con.commit()
+
+
+    @staticmethod
+    def load_ids(names):
+        con = sqlite3.connect("test.db")
+        cursor = con.cursor()
+        result = []
+        for name in names:
+            cursor.execute(f"SELECT Id FROM addr WHERE Name='{name}'")
+            data = cursor.fetchall()
+            result.append(data[0][0])
+        return result
+
+
+    @staticmethod
+    def convert(tup):
+        return dict(tup)
 
 # add_page_title()
 
@@ -30,6 +81,58 @@ from st_pages import Page, show_pages, add_page_title
 # st.set_page_config(
 #         page_title="Результат2222",
 # )
+
+
+class Keeper:
+
+    def load_file(self, source):
+        self.data = pd.read_csv(source)
+        return self.data
+    
+
+    def save_file(self, target):
+        self.data.to_csv(target)
+    
+
+    def extract_subset(self, values):
+        return self.data.loc[values, [f'{value}' for value in values]]
+    
+
+    def is_enough_data(self, values):
+        return not self.extract_subset(values).isnull().values.any()
+    
+
+    def add_data(self, new_data):
+        new_cols = set(new_data.columns) - set(self.data.columns)
+        old_cols = set(new_data.columns).intersection(set(self.data.columns))
+        no_cols = new_cols | old_cols
+        # no_cols.remove('index')
+        # self.data.loc[[int(new_col) for new_col in no_cols], [f'{new_col}' for new_col in no_cols]] = new_data.loc[[int(new_col) for new_col in no_cols], [f'{new_col}' for new_col in no_cols]]
+        # for new_col in new_cols:
+        #     self.data.loc[int(new_col), f'{new_col}'] = 0
+            # fill data
+        # for index, row in new_data.iterrows():
+        #     if index in self.data.index:
+        #         for new_col in new_cols:
+        #             self.data.loc[int(index), f'{new_col}'] = new_data.loc[int(index), f'{new_col}']
+        return self.data
+                
+
+
+    
+    @staticmethod
+    def numpy_to_pandas(matrix, indexes):
+        panda = pd.DataFrame(matrix, columns=indexes)
+        idxs = [f'{index}' for index in indexes]
+        panda['index'] = idxs
+        panda.set_index('index', inplace=True)
+        return panda
+
+
+    def pandas_to_numpy(self):
+        return self.data.to_numpy(), self.data.index
+
+
 
 styles = {'material-icons': {'color': 'blue'},
           'text-icon-link-close-container': {'box-shadow': '#3896de 0px 4px'},
@@ -73,47 +176,7 @@ def get_coordinates(names: list[str]) -> list[tuple[str, float, float]]:
 
 
 def split_big_work(df, time_matrix, work_times, working_day=480):
-    print(df.shape)
-    time_matrix = np.array(time_matrix)
-    n = df.shape[0]
-    df['time_norm'] = df['time_norm'].astype(float)
-    for i in range(1, n):
-        first_work_time = work_times[i]
-        # print(work_times[i])
-        # print(time_matrix[0, i], time_matrix[i, 0])
-        # делим работу, пока она не укладывается в один день
-        while time_matrix[0, i] + time_matrix[i, 0] > working_day:
-            # print(work_times[i] + time_matrix[0, i] + time_matrix[i, 0])
-            delta = working_day - (time_matrix[0, i] + time_matrix[i, 0] - work_times[i]) / 7
-            work_times.append(delta)
-            work_times[i] -= delta
-
-            # далее делаем магию с time_matrix
-            # вычитать дельту!!!!!!!!!!!!!!
-            # вставляем столбец
-            X = np.copy(time_matrix[:, i])
-            time_matrix = np.append(time_matrix, np.expand_dims(X, axis=1), axis=1)
-
-            # вставляем строку
-            X = np.copy(time_matrix[i, :])
-            # X = np.append(X, 0)
-            # print(np.expand_dims(X, axis=0))
-            # print(type(X))
-            # print(type(time_matrix))
-            # print(time_matrix)
-            time_matrix = np.append(time_matrix, np.expand_dims(X, axis=0), axis=0)
-            print(time_matrix)
-            # df.reset_index(inplace=True)
-            new_row = df.iloc[i].copy()
-            # new_row[]
-            # df.loc[len(df)] = new_row
-            # df = df.append(new_row)
-            df = pd.concat([df, new_row.to_frame().T], ignore_index=True)
-            # print(new_row)
-            # print(type(new_row))
-            # print(df)
-            df.loc[-1, 'time_norm'] = delta / 60
-            df.loc[i, 'time_norm'] -= delta / 60
+    pass
 
 
 def export_to_csv():
@@ -121,34 +184,46 @@ def export_to_csv():
 
 
 def working_days(start_date, finish_date):
-    pass
+    # numpy.busdaycalendar.holidays добавлять праздники
+    # print('start date')
+    # print(start_date)
+    # print(f'start_date {start_date} {np.datetime64(start_date)}')
+    # print(finish_date)
+    return np.busday_count(np.datetime64(pd.to_datetime((start_date))).astype('datetime64[D]'), np.datetime64(pd.to_datetime(finish_date)).astype('datetime64[D]') + np.timedelta64(1,'D'))
 
 
 def calculate_time_list(places: list[int], i: int):
     lenghts = nx.single_source_dijkstra_path_length(G_travel_time, places[i], cutoff=28800, weight='travel_time')
-    matrix = {place: lenghts[place] for place in places}
-    return matrix
+    res = {places[i]: lenghts}
+    res[places[i]][places[i]] = 0
+    return res
 
 
-# num_vehicles = int(st.number_input('Введите число бригадодней', value=15))
-# service_time_avg = st.number_input('Введите среднее время одной работы в минутах', value=90)
+
 edited_df = st.session_state['key']
 edited_df = st.data_editor(edited_df, num_rows="dynamic", hide_index=True)
+st.write(len(st.session_state['all_brigades']))
+solution_time = int(st.number_input("Введите время решения в секундах", value=60))
 if st.button('Готово', key='coords'):
+    edited_df['date_start'] = pd.to_datetime(edited_df['date_start']).dt.date
+    edited_df['date_end'] = pd.to_datetime(edited_df['date_end']).dt.date
     with st.spinner('Идет составление расписания, пожалуйста подождите'):
         st.text(edited_df['time_norm'].astype(float).sum() * 60)
         st.text(len(edited_df))
         edited_df['time_norm'] = edited_df['time_norm'].astype(float)
         classic_work = edited_df.iloc[1:].groupby('date_start')['time_norm'].sum()
         days = edited_df.iloc[1:].groupby('date_start').groups.keys()
-        print(classic_work)
+        # print(classic_work)
         classic_work = classic_work.tolist()
         classic_work = [work * 60 for work in classic_work]
-        print(classic_work)
-
+        # print(classic_work)
+        # brigades_num = len(edited_df['brigada'].unique())
+        brigades_num = len(st.session_state['all_brigades'])
+        print(f'brigades num {brigades_num}')
         df1 = {'Время работы в минутах': classic_work, 'Дни': days}
         st.bar_chart(df1, x='Дни', y='Время работы в минутах')
-        st.text('Количество рабочих дней: ' + str(len(days)))
+        edited_df.reset_index(inplace=True)
+        st.text('Количество рабочих дней: ' + str(int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))))
         if 'map' not in st.session_state:
             st.session_state['map'] = ox.io.load_graphml('data/graph.graphml')
         G_travel_time = st.session_state['map']
@@ -157,21 +232,31 @@ if st.button('Готово', key='coords'):
         edited_df.reset_index(inplace=True)
         basic_len = len(edited_df)
         works_num = dict()
+        addr_to_id = {}
+        id_to_addr = {}
+        addresses_to_ids = Saver.addresses_to_ids(edited_df['address'].tolist())
         for i, row in edited_df.iterrows():
-            print(i)
-            works_num[i] = ox.distance.nearest_nodes(
-                G_travel_time, row['lon'], row['lat'], return_dist=False)
+            # print(i)
+            department = row['department']
+            if row['address'] in addresses_to_ids:
+                works_num[i] = addresses_to_ids[row['address']]
+            else:
+                works_num[i] = ox.distance.nearest_nodes(
+                    G_travel_time, row['addr_lon'], row['addr_lat'], return_dist=False)
+            addr_to_id[row['address']] = works_num[i]
+            if works_num[i] not in id_to_addr:
+                id_to_addr[works_num[i]] = [row['address']]
+            else:
+                id_to_addr[works_num[i]].append(row['address'])
             row['time_norm'] = float(row['time_norm'])
-            # if i == 0:
-            #     base_lat = row['lat']
-            #     base_lon = row['lon']
+
             time_norm = math.ceil(float(row['time_norm']) * 60)
             time_from = math.ceil(int(nx.shortest_path_length(G_travel_time, source=works_num[0],
                                                               target=works_num[i], weight='travel_time')) / 60)
             time_to = math.ceil(int(nx.shortest_path_length(G_travel_time, source=works_num[i],
                                                             target=works_num[0], weight='travel_time')) / 60)
             while time_norm + time_from + time_to > 480:
-                delta = 480 - time_from - time_to - 5
+                delta = 480 - time_from - time_to - 3
                 edited_df.loc[i, 'time_norm'] = float(edited_df.loc[i, 'time_norm']) - delta / 60
                 row['time_norm'] -= delta / 60
                 time_norm -= delta
@@ -184,7 +269,7 @@ if st.button('Готово', key='coords'):
 
         count_df = edited_df.groupby(['date_start']).size().values.tolist()
         coords = edited_df.values.tolist()
-        coords_i = [(i, coords[i][-2], coords[i][-1]) for i in range(len(coords))]
+        coords_i = [(i, coords[i][18], coords[i][19]) for i in range(len(coords))]
         # i : node number
 
         # remove ununique node numbers
@@ -192,97 +277,110 @@ if st.button('Готово', key='coords'):
         dicts_number = {works_unique[i]: i for i in range(len(works_unique))}
         st.text(str(coords_i))
         st.text(len(edited_df))
+
+        loaded = []
+        loaded_flag = []
+        # for work in works_unique:
+        #     line = Saver.read_distnces_from_point_exist(work, works_unique)
+        #     loaded.append(line[1])
+        #     loaded_flag.append(line[0])
+        new_visited_points = {}
+        visited_points = {}
+        for work in works_unique:
+            recieved_ways = Saver.read_distnces_from_point_exist(work, works_unique)
+            if len(recieved_ways) == len(works_unique):
+                new_visited_points[work] = recieved_ways
+
         custom_notification_box(icon='info', textDisplay='Приступаем к матрице смежности',
-                                externalLink='shortest_path_length',
-                                url='https://networkx.org/documentation/stable/reference/algorithms/generated'
-                                    '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
-                                styles=styles, key="matrix_start")
-        result = Parallel(n_jobs=-1)(delayed(calculate_time_list)(works_unique, i) for i in range(len(works_unique)))
+                            externalLink='shortest_path_length',
+                            url='https://networkx.org/documentation/stable/reference/algorithms/generated'
+                                '/networkx.algorithms.shortest_paths.generic.shortest_path_length.html',
+                            styles=styles, key="matrix_start")
+        # visited_points = st.session_state['cached']        
+        # points_to_check = list(set(works_num.values()) - set(visited_points.keys()))
+        points_to_check = list(set(works_unique).difference(set(new_visited_points.keys())))
+        st.text(f'points_to_check: {len(points_to_check)}')
+        start_time = time.time()
+
+        lenghts = Parallel(n_jobs=-2)(delayed(calculate_time_list)(points_to_check, i) for i in range(len(points_to_check)))
+        st.text(f'time spent on graph: {time.time() - start_time}')
+        # print(lenghts)
+        for i in range(len(points_to_check)):
+            visited_points[points_to_check[i]] = lenghts[i]
+            
+        # print(visited_points[list(visited_points.keys())[0]])
+        # print(visited_points.keys())
+        result = []
+        for source in works_unique:
+            result.append({})
+            if source in points_to_check:
+                for place in points_to_check:
+                    result[-1][place] = visited_points[source][source].get(place, 9999999)
+            elif source in new_visited_points:
+                for place in new_visited_points.keys():
+                    result[-1][place] = new_visited_points[source].get(place, 9999999)
+
+        # result = [{place: visited_points[source][source].get(place, 9999999) for place in points_to_check} for source in points_to_check]
+        # loaded_result = [{place: new_visited_points for place in new_visited_points.keys()} for source in new_visited_points.keys()]
+        for source in visited_points:
+            for target in visited_points:   
+                Saver.save_distnces_from_point_exist(source, [target], [visited_points[target][target].get(source, 9999999)], id_to_addr[source], id_to_addr[target], department)
         # i [distance to [0] [1]] node number
         # time_matrix = [[works_unique[j] for j in range(len(coords_i))]]
         # [i [distance to 0 1]] node number
         #     from coords_i i to others
-        # for i in range(len(coords_i)):
-        #     print(result[dicts_number[works_num[i]]])
         time_matrix = [[result[dicts_number[works_num[i]]][works_num[j]]
                         for j in range(len(coords_i))] for i in range(len(coords_i))]
 
-        custom_notification_box(icon='info', textDisplay='Закончили с матрицей смежности',
-                                externalLink='', url='#', styles=styles, key="matrix_end")
-        # time_matrix = [result[i][1] for i in range(len(result))]
-        # print(time_matrix)
+        # custom_notification_box(icon='info', textDisplay='Закончили с матрицей смежности',
+        #                         externalLink='', url='#', styles=styles, key="matrix_end")
+
         minute_matrix = [[math.ceil(time_matrix[i][j] / 60) for j in range(len(time_matrix[0]))] for i in
-                         range(len(time_matrix))]
-        # service_time = [service_time_avg for i in range(len(time_matrix))]
-        # print(minute_matrix)
+                            range(len(time_matrix))]
+            # test.data = test.numpy_to_pandas(minute_matrix, list(range(len(minute_matrix))))
+        # for i in range(len(minute_matrix)):
+        #     print(works_unique[i], works_unique, minute_matrix[i])
+        #     Saver.save_distnces_from_point_exist(works_unique[i], works_unique, minute_matrix[i])
+        
+        # else:
+        #     custom_notification_box(icon='info', textDisplay='Загружаем из файла',
+        #                         externalLink='', url='',
+        #                         styles=styles, key="matrix_load")
+        #     print('WOW')
+        #     test.load_file('test.csv')
+        #     minute_matrix = test.pandas_to_numpy()[0]
+        # print(list(range(len(minute_matrix))))
+        # print(test.data)
+        # test.save_file('test.csv')
         service_time = edited_df['time_norm'].astype(float).tolist()
         service_time = [math.ceil(service_time[i] * 60) for i in range(len(service_time))]
         service_time[0] = 0
-        # print(service_time)
+
         for i in range(len(minute_matrix)):
             for j in range(len(minute_matrix)):
                 minute_matrix[i][j] += service_time[j]
             minute_matrix[i][i] = 0
-        print('minute matrix')
-        print(minute_matrix)
 
-        num_vehicles = len(edited_df)
+        days_for_brigade = working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])
+        print(f"days {days_for_brigade}")
+        
+        num_vehicles = brigades_num * days_for_brigade
+        print(f"num {num_vehicles}")
 
 
-        # делим большие работы на кусочки
-        # split_big_work(edited_df, minute_matrix, service_time)
-        # time_matrix = np.array(minute_matrix)
-        # print(time_matrix)
-        # work_times = minute_matrix
-        # working_day = 480
-        # i = 1
-        # delta = working_day - (time_matrix[0, i] + time_matrix[i, 0] - work_times[i])
-        # work_times.append(delta)
-        # work_times[i] -= delta
-        # # нужно запоминать номера уже добавленных строк из этой строки
-        # # далее делаем магию с time_matrix
-        # # вычитать дельту!!!!!!!!!!!!!!
-        # # вставляем столбец
-        # X = np.copy(time_matrix[:, i])
-        # time_matrix = np.append(time_matrix, np.expand_dims(X, axis=1), axis=1)
-        #
-        # # вставляем строку
-        # X = np.copy(time_matrix[i, :])
-        # # X = np.append(X, 0)
-        # # print(np.expand_dims(X, axis=0))
-        # # print(type(X))
-        # # print(type(time_matrix))
-        # # print(time_matrix)
-        # time_matrix = np.append(time_matrix, np.expand_dims(X, axis=0), axis=0)
-        #
-        # # дальше перебрать две колонки
-        # # вычитаем уменьшение работы
-        # time_matrix[:, i] = time_matrix[:, i] - delta
-        # time_matrix[i, i] = 0
-        # # уже вычли дельту
-        # time_matrix[-1, i] = work_times[i]
-        # # переходим к колонке -1
-        # # это все можно сделать сразу после получения df!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-        # print(time_matrix)
-        # # df.reset_index(inplace=True)
-        # new_row = edited_df.iloc[i].copy()
-        # # new_row[]
-        # # df.loc[len(df)] = new_row
-        # # df = df.append(new_row)
-        # df = pd.concat([edited_df, new_row.to_frame().T], ignore_index=True)
-        # # print(new_row)
-        # # print(type(new_row))
-        # # print(df)
-        # df.loc[-1, 'time_norm'] = delta / 60
-        # df.loc[i, 'time_norm'] -= delta / 60
-        # print(df)
+        def flatten(a):
+            return [c for b in a for c in flatten(b)] if hasattr(a, '__iter__') else [a]
+
 
         def create_data_model():
             """Stores the data for the problem."""
             data = {}
             data['time_matrix'] = minute_matrix
-            data['num_vehicles'] = num_vehicles
-            data['depot'] = 0
+            data['num_vehicles'] = int(num_vehicles)
+            # data['depot'] = 0
+
+            data["starts"] = flatten([[i] * days_for_brigade for i in range(int(brigades_num))])
+            data["ends"] = data["starts"].copy()
             # data['time_windows'] = [
             #     (0, 480) for i in range(len(minute_matrix))  # 16
             # ]
@@ -299,41 +397,51 @@ if st.button('Готово', key='coords'):
             time_dimension = routing.GetDimensionOrDie('Time')
             total_time = 0
             day_time = []
-            j = 0
+            j = 1
+            plan_outputs = []
+            global edited_df
             for vehicle_id in range(data['num_vehicles']):
                 index = routing.Start(vehicle_id)
-                plan_output = 'Route for vehicle {}:\n'.format(j)
+
+                plan_output = ''
                 indexes.append([])
                 while not routing.IsEnd(index):
                     time_var = time_dimension.CumulVar(index)
-                    plan_output += '{0} Time({1},{2}) -> '.format(
-                        manager.IndexToNode(index), solution.Min(time_var),
+                    plan_output += '{0} Время({1},{2}) -> '.format(
+                        edited_df.iloc[manager.IndexToNode(index)]['address'], solution.Min(time_var),
                         solution.Max(time_var))
                     index = solution.Value(routing.NextVar(index))
                     indexes[i].append(manager.IndexToNode(index))
                 time_var = time_dimension.CumulVar(index)
-                plan_output += '{0} Time({1},{2})\n'.format(manager.IndexToNode(index),
+                plan_output += '{0} Время({1},{2})\n'.format(edited_df.iloc[manager.IndexToNode(index)]['address'],
                                                             solution.Min(time_var),
                                                             solution.Max(time_var))
-                plan_output += 'Time of the route: {}min\n'.format(
+                plan_output += 'Время маршрута: {}min\n'.format(
                     solution.Min(time_var))
                 day_time.append(solution.Min(time_var))
                 # times.append(solution.Min(time_var))
                 i += 1
+                plan_outputs.append((plan_output, solution.Min(time_var)))
                 # x.append(i)
                 if solution.Min(time_var) > 0:
                     j += 1
-                    st.text(plan_output)
+                #     st.text(plan_output)
                 total_time += solution.Min(time_var)
-            print(indexes)
-
+            # print(indexes)
+            plan_outputs = sorted(plan_outputs, key=lambda x: x[1], reverse=True)
+            j = 1
+            for route, time in plan_outputs:
+                if time > 0:
+                    text = 'Маршрут в {} день:\n'.format(j) + route
+                    j += 1
+                    st.text(text)
             # Сохраняем таблицу
-            global edited_df
+
             inds = list(filter(lambda i: i != [0], indexes))
 
             df = edited_df.reset_index(drop=True)
             print(334, df.columns.values)
-            df.drop(columns=['lat', 'lon'], index=0, inplace=True)
+            df.drop(columns=['addr_lat', 'addr_lon'], index=0, inplace=True)
             dates = sorted(df.date_start.unique())
 
             for date_num, route in enumerate(inds):
@@ -352,38 +460,27 @@ if st.button('Готово', key='coords'):
             df.sort_values(by=['date_number', 'visiting_order'], inplace=True)
             csv = df.to_csv(index=False)
 
-            # fig, ax = plt.subplots()
             my_works = [len(indexes[i]) - 1 for i in range(len(indexes))]
             my_works = list(filter(lambda num: num != 0, my_works))
             new_work_time = [[service_time[j] for j in indexes[i]] for i in range(len(indexes))]
-            # print(new_work_time)
             new_work_time = [sum(new_work_time[i]) for i in range(len(new_work_time))]
-            # print(new_work_time)
-            # work_time = sum(my_works)
             work_time = sum(new_work_time)
             day_work = len(my_works)
             old_work_time = sum(count_df)
             old_day_work = len(count_df)
-            # print(count_df)
-            # print(my_works)
+
             if len(my_works) < len(count_df):
                 my_works.extend([0] * (len(count_df) - len(my_works)))
             elif len(my_works) > len(count_df):
                 count_df.extend([0] * (len(my_works) - len(count_df)))
-            # ax.plot(x, times, linewidth=2.0)
-            st.text('Total time of all routes: {}min'.format(total_time))
-            # df = {'Предложенное решение': my_works, 'Изначальное решение': count_df}
+            st.text('Время всех маршрутов: {}min'.format(total_time))
             new_work_time, day_time = zip(*sorted(zip(new_work_time, day_time), key=lambda x: x[1], reverse=True))
-            # df1 = {'Время работы': new_work_time}
-            # df2 = {'Время работы и пути': day_time}
             way_time = [day_time[i] - new_work_time[i] for i in range(len(day_time))]
             days = edited_df.iloc[1:].groupby('date_start').groups.keys()
             df1 = {'Рабочие дни': list(days)[:day_work], 'Время работы в минутах': new_work_time[:day_work],
                    'Время пути в минутах': way_time[:day_work]}
             st.bar_chart(df1, x='Рабочие дни', y=('Время работы в минутах', 'Время пути в минутах'))
-            # st.bar_chart(df2)
-            # st.line_chart(df)
-            # col1, \
+
             col1, col2, col3, col4 = st.columns(4)
 
             col1.metric(label="Среднее число задач в день", value=str(basic_len / day_work),
@@ -395,7 +492,7 @@ if st.button('Готово', key='coords'):
                         delta=str(round(((sum(service_time) / day_work)
                                          - (sum(service_time) / len(days))) * 100 / 8 / 60)) + '%'
                         )
-            col1.metric(label="Число рабочих дней", value=str(day_work),
+            col4.metric(label="Число рабочих дней", value=str(day_work),
                         delta=str(day_work - len(days)), delta_color="inverse")
 
             st.download_button(
@@ -406,17 +503,100 @@ if st.button('Готово', key='coords'):
             )
 
 
+        def new_print(data, manager, routing, solution):
+            i = 0
+            indexes = []
+            # print(f'Objective: {solution.ObjectiveValue()}')
+            time_dimension = routing.GetDimensionOrDie('Time')
+            total_time = 0
+            day_time = []
+            j = 1
+            plan_outputs = []
+            global edited_df
+            brigade_total_work = []
+            brigades_days_time = [[], []]
+            for vehicle_id in range(data['num_vehicles']):
+                index = routing.Start(vehicle_id)
+                l = 0
+                plan_output = f"Номер бригады: {vehicle_id // int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + 1}\n"
+                plan_output += f"Номер рабочего дня: {vehicle_id % int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + 1}\n"
+                indexes.append([])
+                while not routing.IsEnd(index):
+                    l += 1
+                    time_var = time_dimension.CumulVar(index)
+                    plan_output += '{0} Время({1},{2}) -> '.format(
+                        edited_df.iloc[manager.IndexToNode(index)]['address'], solution.Min(time_var),
+                        solution.Max(time_var))
+                    index = solution.Value(routing.NextVar(index))
+                    indexes[i].append(manager.IndexToNode(index))
+                time_var = time_dimension.CumulVar(index)
+                plan_output += '{0} Время({1},{2})\n'.format(edited_df.iloc[manager.IndexToNode(index)]['address'],
+                                                            solution.Min(time_var),
+                                                            solution.Max(time_var))
+                plan_output += 'Время маршрута: {}min\n'.format(
+                    solution.Min(time_var))
+                plan_output += f"Количество задач: {l - 1}"
+                brigades_days_time[0].append(
+                    pd.to_datetime(np.busday_offset(np.datetime64(edited_df.loc[0, 'date_start']), vehicle_id % int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + 1, roll='forward')))
+                brigades_days_time[1].append(solution.Min(time_var))
+                if solution.Min(time_var) > 0:
+                    st.text(plan_output)
+                day_time.append(solution.Min(time_var))
+                # times.append(solution.Min(time_var))
+                i += 1
+                plan_outputs.append((plan_output, solution.Min(time_var)))
+                # x.append(i)
+                if solution.Min(time_var) > 0:
+                    j += 1
+                #     st.text(plan_output)
+                total_time += solution.Min(time_var)
+                if (vehicle_id % int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))) == (int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) - 1):
+                    brigade_total_work.append(total_time)
+                    
+                    if total_time > 0:
+                        st.text(f"Общее время: {total_time}")
+                        # print(brigades_days_time[:][0])
+                        # print(brigades_days_time[:][1])
+                        df1 = {'Рабочие дни': np.array(brigades_days_time[0]),
+                               'Общее время в минутах': np.array(brigades_days_time[1])}
+                        st.bar_chart(df1, x='Рабочие дни', y=('Общее время в минутах'))
+                        total_time = 0
+                        brigades_days_time = [[], []]
+            if brigades_days_time != [] and total_time > 0:
+                st.text(f"Общее время: {total_time}")
+                df1 = {'Рабочие дни': np.array(brigades_days_time[0]),
+                               'Общее время в минутах': np.array(brigades_days_time[1])}
+                st.bar_chart(df1, x='Рабочие дни', y=('Общее время в минутах'))
+
+
+
+        def fixing_task(manager, routing, work_id, date):
+            index = manager.NodeToIndex(work_id)
+            brigades_ids = [-1]
+            print(f'id {work_id}')
+            for j in range(brigades_num):
+                # print(f"num days {int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))}")
+                # print(f"num days 2 {int(working_days(edited_df.loc[0, 'date_start'], date))}")
+                # print(f"daybrigade {j * int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + int(working_days(edited_df.loc[0, 'date_start'], date))}")
+                brigades_ids.append(j * int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + int(working_days(edited_df.loc[0, 'date_start'], date)))
+            routing.VehicleVar(index).SetValues(brigades_ids)
+
+
         def main():
             """Solve the VRP with time windows."""
             # Instantiate the data problem.
             data = create_data_model()
-
+            # print(data)
             # Create the routing index manager.
             manager = pywrapcp.RoutingIndexManager(len(data['time_matrix']),
-                                                   data['num_vehicles'], data['depot'])
+                                                   int(num_vehicles), data["starts"], data["ends"])
 
             # Create Routing Model.
             routing = pywrapcp.RoutingModel(manager)
+            reset_df = edited_df.reset_index(drop=True)
+            frozen_tasks = reset_df[reset_df['work_type'] == "OTS"]
+            for i, row in frozen_tasks.iterrows():
+                fixing_task(manager, routing, i, row['date_start'])
 
             # Create and register a transit callback.
             def time_callback(from_index, to_index):
@@ -427,30 +607,26 @@ if st.button('Готово', key='coords'):
                 return data['time_matrix'][from_node][to_node]
 
             transit_callback_index = routing.RegisterTransitCallback(time_callback)
-
+            for vehicle_id in range(num_vehicles):
+                routing.SetFixedCostOfVehicle(
+                    vehicle_id * 10000, vehicle_id)
+                    # 1000 * vehicle_id**3 // int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + vehicle_id ** 2, vehicle_id)
             # Define cost of each arc.
             routing.SetArcCostEvaluatorOfAllVehicles(transit_callback_index)
-
+            # index = manager.NodeToIndex(1)
+            # routing.VehicleVar(index).SetValues([-1, 0])
+            # index = manager.NodeToIndex(22)
+            # routing.VehicleVar(index).SetValues([-1, 0])
             # Add Time Windows constraint.
             time = 'Time'
             routing.AddDimension(
                 transit_callback_index,
-                30,  # allow waiting time
+                0,  # allow waiting time
                 480,  # maximum time per vehicle
-                False,  # Don't force start cumul to zero.
+                True,  # force start cumul to zero.
                 time)
             time_dimension = routing.GetDimensionOrDie(time)
-            # for location_idx, time_window in enumerate(data['time_windows']):
-            #     if location_idx == data['depot']:
-            #         continue
-            #     index = manager.NodeToIndex(location_idx)
-            #     time_dimension.CumulVar(index).SetRange(time_window[0], time_window[1])
-            # depot_idx = data['depot']
-            # for vehicle_id in range(data['num_vehicles']):
-            #     index = routing.Start(vehicle_id)
-            #     time_dimension.CumulVar(index).SetRange(
-            #         data['time_windows'][depot_idx][0],
-            #         data['time_windows'][depot_idx][1])
+
             # Instantiate route start and end times to produce feasible times.
             for i in range(data['num_vehicles']):
                 routing.AddVariableMinimizedByFinalizer(
@@ -464,8 +640,8 @@ if st.button('Готово', key='coords'):
                 routing_enums_pb2.FirstSolutionStrategy.PATH_CHEAPEST_ARC)
             # search_parameters.time_limit.seconds = 30
             search_parameters.use_full_propagation = False
-            search_parameters.time_limit.seconds = 60
-            search_parameters.log_search = True
+            search_parameters.time_limit.seconds = solution_time
+            search_parameters.log_search = False
             search_parameters.use_full_propagation = True
             search_parameters.local_search_metaheuristic = (
                 routing_enums_pb2.LocalSearchMetaheuristic.SIMULATED_ANNEALING)
@@ -473,9 +649,11 @@ if st.button('Готово', key='coords'):
             solution = routing.SolveWithParameters(search_parameters)
             # Print solution on console.
             if solution:
-                print_solution(data, manager, routing, solution)
+                new_print(data, manager, routing, solution)
             else:
                 print('no solution')
-
-
+        # #     можно переписать на комбинацию всех методов и выбор лучшего
+        #     for i, row in frozen_tasks.iterrows():
+        #         fixing_task(manager, routing, i, row['date_start'])
+        st.text(f'started solution')
         main()
