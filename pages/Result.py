@@ -574,11 +574,22 @@ if st.button('Готово', key='coords'):
             index = manager.NodeToIndex(work_id)
             brigades_ids = [-1]
             print(f'id {work_id}')
-            for j in range(brigades_num):
+            for brigade_number in range(brigades_num):
                 # print(f"num days {int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))}")
                 # print(f"num days 2 {int(working_days(edited_df.loc[0, 'date_start'], date))}")
                 # print(f"daybrigade {j * int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + int(working_days(edited_df.loc[0, 'date_start'], date))}")
-                brigades_ids.append(j * int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + int(working_days(edited_df.loc[0, 'date_start'], date)))
+                brigades_ids.append(brigade_number * int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end'])) + int(working_days(edited_df.loc[0, 'date_start'], date)))
+            routing.VehicleVar(index).SetValues(brigades_ids)
+
+
+        def part_freezing_task(manager, routing, work_id, date):
+            # st.write('work on ' + str(work_id))
+            index = manager.NodeToIndex(work_id)
+            brigades_ids = [-1]
+            num_work_days = int(working_days(edited_df.loc[0, 'date_start'], edited_df.loc[0, 'date_end']))
+            for brigade_number in range(brigades_num):
+                for day_number in range(int(working_days(edited_df.loc[0, 'date_start'], date))):
+                    brigades_ids.append(brigade_number * num_work_days + day_number)
             routing.VehicleVar(index).SetValues(brigades_ids)
 
 
@@ -595,8 +606,13 @@ if st.button('Готово', key='coords'):
             routing = pywrapcp.RoutingModel(manager)
             reset_df = edited_df.reset_index(drop=True)
             frozen_tasks = reset_df[reset_df['work_type'] == "OTS"]
+            non_frozen_tasks = reset_df[reset_df['work_type'] != "OTS"].iloc[brigades_num:,:]
             for i, row in frozen_tasks.iterrows():
                 fixing_task(manager, routing, i, row['date_start'])
+
+            for i, row in non_frozen_tasks.iterrows():
+                # st.write(str(row['address']))
+                part_freezing_task(manager, routing, i, row['date_end'])
 
             # Create and register a transit callback.
             def time_callback(from_index, to_index):
@@ -641,7 +657,7 @@ if st.button('Готово', key='coords'):
             # search_parameters.time_limit.seconds = 30
             search_parameters.use_full_propagation = False
             search_parameters.time_limit.seconds = solution_time
-            search_parameters.log_search = False
+            search_parameters.log_search = True
             search_parameters.use_full_propagation = True
             search_parameters.local_search_metaheuristic = (
                 routing_enums_pb2.LocalSearchMetaheuristic.SIMULATED_ANNEALING)
